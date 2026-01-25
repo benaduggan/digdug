@@ -13,20 +13,14 @@ export default [
             sourceType: 'module',
             globals: {
                 ...globals.browser,
-                ...globals.node, // Add this if you use build tools like Vite or Webpack
+                ...globals.node,
             },
         },
         rules: {
-            // Best Practices
             'no-unused-vars': 'warn',
             'no-console': 'off', // Set to "warn" for production-ready apps
             'prefer-const': 'error',
             eqeqeq: ['error', 'always'],
-
-            // Style (if not using Prettier)
-            indent: ['error', 2],
-            quotes: ['error', 'single'],
-            semi: ['error', 'always'],
         },
     },
 ];
