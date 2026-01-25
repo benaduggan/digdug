@@ -397,8 +397,18 @@ export class Game {
             const spawnPos = this.levelManager.getEnemySpawnPosition(index);
             enemy.x = spawnPos.x;
             enemy.y = spawnPos.y;
+
+            // Reset all timers and state
             enemy.ghostModeTimer = 0;
             enemy.canGhostMode = false;
+            enemy.tunnelSeekTimer = 0;
+            enemy.isGhosting = false;
+            enemy.inTunnel = true;
+            enemy.state = 'roaming';
+            enemy.stateTimer = 0;
+            enemy.isLastEnemy = false;
+            enemy.isEscaping = false;
+            enemy.hasEscaped = false;
         });
     }
 

@@ -60,7 +60,9 @@ export class Enemy {
         const currentlyInTunnel = grid.isEmpty(gx, gy);
 
         // If we just entered a tunnel from dirt, reset ghost mode timer
-        if (currentlyInTunnel && !this.inTunnel) {
+        // BUT only if we're fully in the tunnel (not at the edge in dirt)
+        const actuallyInDirt = grid.isDirt(gx, gy);
+        if (currentlyInTunnel && !this.inTunnel && !actuallyInDirt) {
             // Just entered tunnel - disable ghost mode for 5 seconds
             this.ghostModeTimer = 0;
             this.canGhostMode = false;
@@ -71,7 +73,7 @@ export class Enemy {
             this.tunnelDirection = this.detectTunnelDirection(gx, gy, grid);
 
             // Immediately pick a valid direction for the tunnel
-            this.pickValidDirection(grid);
+            this.pickValidDirection(grid, player);
 
             // TRANSITION TO CHASING MODE to actively seek player
             this.state = 'chasing';
@@ -80,10 +82,13 @@ export class Enemy {
 
         this.inTunnel = currentlyInTunnel;
 
-        // Update ghost mode timer (only counts up when conditions are met)
-        this.ghostModeTimer += deltaTime;
-        if (this.ghostModeTimer >= this.GHOST_MODE_DELAY) {
-            this.canGhostMode = true;
+        // Update ghost mode timer - only when in tunnels
+        // (Ghost mode is for leaving tunnels to move through dirt)
+        if (this.inTunnel && !this.canGhostMode) {
+            this.ghostModeTimer += deltaTime;
+            if (this.ghostModeTimer >= this.GHOST_MODE_DELAY) {
+                this.canGhostMode = true;
+            }
         }
 
         // Track time spent in tunnels (tunnel seeking timeout)
@@ -109,7 +114,7 @@ export class Enemy {
 
         // Move enemy
         if (this.isMoving && !this.isInflating) {
-            this.move(grid);
+            this.move(grid, player);
         }
 
         // Update animation
@@ -154,7 +159,7 @@ export class Enemy {
         if (this.state === 'chasing' && player) {
             this.chasePlayer(player, grid);
         } else {
-            this.roam(grid);
+            this.roam(grid, player);
         }
     }
 
@@ -176,10 +181,10 @@ export class Enemy {
     /**
      * Roam - follow tunnel direction if in tunnel without ghost mode
      */
-    roam(grid) {
+    roam(grid, player = null) {
         // Random direction changes
         if (this.directionChangeTimer > 1000 + Math.random() * 1000) {
-            this.pickValidDirection(grid);
+            this.pickValidDirection(grid, player);
             this.directionChangeTimer = 0;
         }
     }
@@ -242,31 +247,25 @@ export class Enemy {
     /**
      * Move enemy
      */
-    move(grid) {
-        let newX = this.x;
-        let newY = this.y;
-
-        // Determine if currently in dirt
+    move(grid, player = null) {
+        // Calculate move speed based on current tile
         const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
         const inDirt = grid.isDirt(gx, gy);
 
-        // Enemies can only ghost through dirt after 2 seconds
-        // Before that, they're stuck in tunnels
         let moveSpeed = this.speed;
         if (inDirt) {
             if (this.canGhostMode) {
                 // Can ghost through dirt at reduced speed
                 moveSpeed = this.speed * 0.6;
-                this.isGhosting = true;
             } else {
-                // Can't move through dirt yet - stuck in tunnels
-                // Try to find a tunnel direction
-                this.isGhosting = false;
-                return; // Don't move if in dirt and can't ghost yet
+                // Can't ghost through dirt - don't move
+                return;
             }
-        } else {
-            this.isGhosting = false;
         }
+
+        // Before moving, check if the destination is valid
+        let newX = this.x;
+        let newY = this.y;
 
         switch (this.direction) {
             case DIRECTIONS.UP:
@@ -300,14 +299,43 @@ export class Enemy {
         }
 
         // Check if can move to new position
-        const canMove = this.canMoveToPosition(newX, newY, grid);
+        let canMove = this.canMoveToPosition(newX, newY, grid);
+
+        // Additional check: if we can't ghost mode, we can't move into dirt
+        if (canMove && !this.canGhostMode) {
+            const { x: newGx, y: newGy } = grid.pixelToGrid(newX, newY);
+            const nextTileIsDirt = grid.isDirt(newGx, newGy);
+
+            // If next tile is dirt and we can't ghost, don't move
+            if (nextTileIsDirt) {
+                canMove = false;
+                // Pick a new direction that stays in tunnels
+                this.pickValidDirection(grid, player);
+                return; // Don't move this frame
+            }
+        }
 
         if (canMove) {
             this.x = newX;
             this.y = newY;
 
+            // Update isGhosting based on NEW position after movement
+            const { x: currentGx, y: currentGy } = grid.pixelToGrid(
+                this.x,
+                this.y
+            );
+            const currentlyInDirt = grid.isDirt(currentGx, currentGy);
+            const currentlyInTunnel = grid.isEmpty(currentGx, currentGy);
+
+            // Set ghosting state based on actual current position
+            this.isGhosting = currentlyInDirt && this.canGhostMode;
+
             // SNAP TO GRID when in tunnels (not ghosting)
-            if (!this.isGhosting && this.inTunnel) {
+            // This ensures enemies stay centered in tunnels and don't visually overlap dirt
+            // Only apply grid snapping if:
+            // 1. Not ghosting (moving through dirt)
+            // 2. Currently in a tunnel (empty tile)
+            if (!this.isGhosting && currentlyInTunnel) {
                 // When moving horizontally, align vertically
                 if (
                     this.direction === DIRECTIONS.LEFT ||
@@ -318,9 +346,17 @@ export class Enemy {
                     const targetY = gridY * TILE_SIZE;
                     const diff = targetY - this.y;
                     if (Math.abs(diff) > 0) {
-                        this.y +=
+                        const snapAmount =
                             Math.sign(diff) *
                             Math.min(Math.abs(diff), this.speed);
+                        const testY = this.y + snapAmount;
+
+                        // Only snap if the snapped position is still in a tunnel
+                        const testCenterY = testY + TILE_SIZE / 2;
+                        const testGridY = Math.floor(testCenterY / TILE_SIZE);
+                        if (grid.isEmpty(currentGx, testGridY)) {
+                            this.y = testY;
+                        }
                     }
                 }
 
@@ -334,15 +370,23 @@ export class Enemy {
                     const targetX = gridX * TILE_SIZE;
                     const diff = targetX - this.x;
                     if (Math.abs(diff) > 0) {
-                        this.x +=
+                        const snapAmount =
                             Math.sign(diff) *
                             Math.min(Math.abs(diff), this.speed);
+                        const testX = this.x + snapAmount;
+
+                        // Only snap if the snapped position is still in a tunnel
+                        const testCenterX = testX + TILE_SIZE / 2;
+                        const testGridX = Math.floor(testCenterX / TILE_SIZE);
+                        if (grid.isEmpty(testGridX, currentGy)) {
+                            this.x = testX;
+                        }
                     }
                 }
             }
         } else {
             // Hit a rock or can't move, pick a valid direction
-            this.pickValidDirection(grid);
+            this.pickValidDirection(grid, player);
         }
     }
 
@@ -359,7 +403,7 @@ export class Enemy {
     /**
      * Pick a valid direction based on what's available
      */
-    pickValidDirection(grid) {
+    pickValidDirection(grid, player = null) {
         const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
         const validDirections = [];
 
@@ -378,6 +422,47 @@ export class Enemy {
             }
             if (grid.isEmpty(gx + 1, gy) && !grid.isRock(gx + 1, gy)) {
                 validDirections.push(DIRECTIONS.RIGHT);
+            }
+
+            // If we have a player reference and we're chasing, prefer direction toward player
+            if (
+                player &&
+                this.state === 'chasing' &&
+                validDirections.length > 0
+            ) {
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+
+                // Determine preferred directions based on player position
+                let preferredDirection = null;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    preferredDirection =
+                        dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+                } else {
+                    preferredDirection =
+                        dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+                }
+
+                // If preferred direction is valid, use it
+                if (validDirections.includes(preferredDirection)) {
+                    this.direction = preferredDirection;
+                    return;
+                }
+
+                // Otherwise try secondary direction
+                let secondaryDirection = null;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    secondaryDirection =
+                        dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+                } else {
+                    secondaryDirection =
+                        dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+                }
+
+                if (validDirections.includes(secondaryDirection)) {
+                    this.direction = secondaryDirection;
+                    return;
+                }
             }
         } else {
             // Free roaming - check all directions (can go through dirt if can ghost)
@@ -411,7 +496,7 @@ export class Enemy {
             }
         }
 
-        // Pick a random valid direction
+        // Pick a random valid direction as fallback
         if (validDirections.length > 0) {
             this.direction =
                 validDirections[
