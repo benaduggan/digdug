@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dig Dug - Example</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+    }
+
+    #game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border: 2px solid #333;
+    }
+
+    .info {
+      text-align: center;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="game"></div>
+    <div class="info">
+      <p>Arrow Keys or WASD: Move | Space: Pump</p>
+      <p>ESC: Pause</p>
+    </div>
+  </div>
+
+  <!-- Include the built library -->
+  <script type="module">
+    import DigDug from '../dist/digdug.es.js';
+
+    const game = new DigDug({
+      container: document.getElementById('game'),
+      scale: 2,
+      debug: false,
+      onGameOver: (score) => {
+        console.log('Game Over! Final Score:', score);
+        alert(`Game Over! Score: ${score}`);
+      },
+      onLevelComplete: (level) => {
+        console.log('Level Complete:', level);
+      },
+      onScoreChange: (score) => {
+        // Update score display if needed
+      }
+    });
+
+    game.start();
+  </script>
+</body>
+</html>

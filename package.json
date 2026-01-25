@@ -1,0 +1,40 @@
+{
+  "name": "digdug-game",
+  "version": "1.0.0",
+  "description": "A faithful recreation of the classic 1982 Dig Dug arcade game using vanilla JavaScript and HTML5 Canvas",
+  "main": "dist/digdug.js",
+  "module": "dist/digdug.esm.js",
+  "browser": "dist/digdug.umd.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "digdug",
+    "dig dug",
+    "arcade",
+    "game",
+    "retro",
+    "html5",
+    "canvas",
+    "javascript",
+    "pixel-art",
+    "namco",
+    "classic-game"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ]
+}
