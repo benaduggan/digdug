@@ -10,6 +10,8 @@ export const GAME_STATES = {
     MENU: 'menu',
     PLAYING: 'playing',
     PAUSED: 'paused',
+    DYING: 'dying',
+    RESPAWNING: 'respawning',
     LEVEL_COMPLETE: 'level_complete',
     GAME_OVER: 'game_over',
 };
@@ -105,4 +107,11 @@ export const LEVEL = {
     ENEMY_INCREMENT: 1, // Additional enemies per level
     ROCKS_PER_LEVEL: 3,
     ROCKS_FOR_BONUS: 2, // Number of rocks dropped to spawn bonus
+};
+
+// Death settings
+export const DEATH = {
+    ANIMATION_DURATION: 1000, // 1 second death animation
+    RESPAWN_DELAY: 3000, // 3 seconds "Player 1 Ready" display
+    INVINCIBILITY_TIME: 2000, // 2 seconds invincibility after respawn
 };

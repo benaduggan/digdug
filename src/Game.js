@@ -3,6 +3,7 @@ import {
     CANVAS_HEIGHT,
     GAME_STATES,
     COLORS,
+    DEATH,
 } from './utils/constants.js';
 import { Renderer } from './Renderer.js';
 import { Grid } from './utils/Grid.js';
@@ -187,6 +188,14 @@ export class Game {
                 this.update(deltaTime);
                 this.render();
                 break;
+            case GAME_STATES.DYING:
+                this.updateDeath(deltaTime);
+                this.render(); // Render death animation
+                break;
+            case GAME_STATES.RESPAWNING:
+                this.updateRespawn(deltaTime);
+                this.renderRespawning();
+                break;
             case GAME_STATES.PAUSED:
                 this.renderPaused();
                 break;
@@ -215,6 +224,11 @@ export class Game {
         // Update player
         if (this.player) {
             this.player.update(deltaTime, this.inputManager, this.grid);
+        }
+
+        // Mark last enemy
+        if (this.enemies.length === 1) {
+            this.enemies[0].isLastEnemy = true;
         }
 
         // Update enemies
@@ -262,8 +276,8 @@ export class Game {
                     this.config.onScoreChange(this.scoreManager.score);
                     return false; // Remove enemy
                 } else {
-                    // Player hit
-                    this.playerHit();
+                    // Player hit by enemy
+                    this.playerHit('enemy');
                 }
             }
             return true;
@@ -297,13 +311,16 @@ export class Game {
                         this.player
                     )
                 ) {
-                    this.playerHit();
+                    this.playerHit('rock');
                 }
             }
         });
 
         // Remove destroyed/crumbled rocks
         this.rocks = this.rocks.filter((rock) => !rock.isDestroyed);
+
+        // Remove escaped enemies
+        this.enemies = this.enemies.filter((enemy) => !enemy.hasEscaped);
 
         // Player-bonus item collisions
         this.bonusItems = this.bonusItems.filter((item) => {
@@ -337,14 +354,62 @@ export class Game {
     /**
      * Handle player getting hit
      */
-    playerHit() {
-        this.scoreManager.loseLife();
+    playerHit(deathType = 'enemy') {
+        if (this.player.isInvincible) return; // Skip if invincible
 
-        if (this.scoreManager.lives <= 0) {
-            this.gameOver();
-        } else {
-            // Respawn player
-            this.player = new Player(this.grid);
+        // Start death animation
+        this.player.startDeath(deathType);
+        this.state = GAME_STATES.DYING;
+        this.deathStartTime = Date.now();
+    }
+
+    /**
+     * Update death animation state
+     */
+    updateDeath(deltaTime) {
+        this.player.update(deltaTime, null, this.grid);
+
+        if (this.player.deathTimer >= DEATH.ANIMATION_DURATION) {
+            // Death animation complete
+            this.scoreManager.loseLife();
+
+            if (this.scoreManager.lives <= 0) {
+                this.gameOver();
+            } else {
+                this.startRespawn();
+            }
+        }
+    }
+
+    /**
+     * Start respawn sequence
+     */
+    startRespawn() {
+        this.state = GAME_STATES.RESPAWNING;
+        this.respawnStartTime = Date.now();
+
+        // Reset player position
+        this.player = new Player(this.grid);
+        this.player.isInvincible = true;
+
+        // Reset enemy positions to their spawn tunnels
+        this.enemies.forEach((enemy, index) => {
+            const spawnPos = this.levelManager.getEnemySpawnPosition(index);
+            enemy.x = spawnPos.x;
+            enemy.y = spawnPos.y;
+            enemy.ghostModeTimer = 0;
+            enemy.canGhostMode = false;
+        });
+    }
+
+    /**
+     * Update respawn state
+     */
+    updateRespawn(deltaTime) {
+        const elapsed = Date.now() - this.respawnStartTime;
+
+        if (elapsed >= DEATH.RESPAWN_DELAY) {
+            this.state = GAME_STATES.PLAYING;
         }
     }
 
@@ -435,6 +500,14 @@ export class Game {
             color: COLORS.TEXT_YELLOW,
             align: 'center',
         });
+    }
+
+    /**
+     * Render respawning state
+     */
+    renderRespawning() {
+        this.render();
+        this.renderer.renderRespawning();
     }
 
     /**

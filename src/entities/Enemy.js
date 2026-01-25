@@ -21,6 +21,10 @@ export class Enemy {
         this.inTunnel = true; // Track if currently in tunnel
         this.tunnelDirection = null; // Direction of tunnel (horizontal/vertical)
 
+        // Tunnel seeking timeout
+        this.tunnelSeekTimer = 0;
+        this.TUNNEL_SEEK_TIMEOUT = 8000; // 8 seconds
+
         // AI state
         this.state = 'roaming'; // roaming, chasing
         this.targetX = x;
@@ -40,6 +44,11 @@ export class Enemy {
 
         // Distance from player (for scoring)
         this.distanceFromPlayer = 0;
+
+        // Escape behavior (last enemy)
+        this.isLastEnemy = false;
+        this.isEscaping = false;
+        this.hasEscaped = false;
     }
 
     /**
@@ -56,12 +65,17 @@ export class Enemy {
             this.ghostModeTimer = 0;
             this.canGhostMode = false;
             this.isGhosting = false;
+            this.tunnelSeekTimer = 0; // Start tunnel seek timer
 
             // Detect tunnel direction (horizontal or vertical)
             this.tunnelDirection = this.detectTunnelDirection(gx, gy, grid);
 
             // Immediately pick a valid direction for the tunnel
             this.pickValidDirection(grid);
+
+            // TRANSITION TO CHASING MODE to actively seek player
+            this.state = 'chasing';
+            this.stateTimer = 0;
         }
 
         this.inTunnel = currentlyInTunnel;
@@ -70,6 +84,19 @@ export class Enemy {
         this.ghostModeTimer += deltaTime;
         if (this.ghostModeTimer >= this.GHOST_MODE_DELAY) {
             this.canGhostMode = true;
+        }
+
+        // Track time spent in tunnels (tunnel seeking timeout)
+        if (this.inTunnel && !this.canGhostMode) {
+            this.tunnelSeekTimer += deltaTime;
+
+            // After 8 seconds in tunnels, allow ghost mode again
+            if (this.tunnelSeekTimer >= this.TUNNEL_SEEK_TIMEOUT) {
+                this.canGhostMode = true;
+                this.tunnelSeekTimer = 0;
+            }
+        } else {
+            this.tunnelSeekTimer = 0; // Reset when ghosting or not in tunnel
         }
 
         // Update AI state
@@ -105,6 +132,16 @@ export class Enemy {
      * Update AI behavior
      */
     updateAI(deltaTime, player, grid) {
+        // If last enemy, attempt escape
+        if (this.isLastEnemy && !this.isEscaping) {
+            this.startEscape();
+        }
+
+        if (this.isEscaping) {
+            this.escape(grid);
+            return; // Skip normal AI
+        }
+
         this.stateTimer += deltaTime;
         this.directionChangeTimer += deltaTime;
 
@@ -144,6 +181,29 @@ export class Enemy {
         if (this.directionChangeTimer > 1000 + Math.random() * 1000) {
             this.pickValidDirection(grid);
             this.directionChangeTimer = 0;
+        }
+    }
+
+    /**
+     * Start escape behavior (last enemy)
+     */
+    startEscape() {
+        this.isEscaping = true;
+        this.direction = DIRECTIONS.UP;
+        this.canGhostMode = true; // Enable ghosting to escape through dirt
+        this.speed = this.baseSpeed * 1.5; // 50% faster when escaping
+    }
+
+    /**
+     * Escape behavior - move upward to top of screen
+     */
+    escape(grid) {
+        // Always move upward toward top edge
+        this.direction = DIRECTIONS.UP;
+
+        // Check if reached top of screen
+        if (this.y <= 0) {
+            this.hasEscaped = true; // Mark for removal
         }
     }
 
@@ -245,6 +305,41 @@ export class Enemy {
         if (canMove) {
             this.x = newX;
             this.y = newY;
+
+            // SNAP TO GRID when in tunnels (not ghosting)
+            if (!this.isGhosting && this.inTunnel) {
+                // When moving horizontally, align vertically
+                if (
+                    this.direction === DIRECTIONS.LEFT ||
+                    this.direction === DIRECTIONS.RIGHT
+                ) {
+                    const centerY = this.y + TILE_SIZE / 2;
+                    const gridY = Math.floor(centerY / TILE_SIZE);
+                    const targetY = gridY * TILE_SIZE;
+                    const diff = targetY - this.y;
+                    if (Math.abs(diff) > 0) {
+                        this.y +=
+                            Math.sign(diff) *
+                            Math.min(Math.abs(diff), this.speed);
+                    }
+                }
+
+                // When moving vertically, align horizontally
+                if (
+                    this.direction === DIRECTIONS.UP ||
+                    this.direction === DIRECTIONS.DOWN
+                ) {
+                    const centerX = this.x + TILE_SIZE / 2;
+                    const gridX = Math.floor(centerX / TILE_SIZE);
+                    const targetX = gridX * TILE_SIZE;
+                    const diff = targetX - this.x;
+                    if (Math.abs(diff) > 0) {
+                        this.x +=
+                            Math.sign(diff) *
+                            Math.min(Math.abs(diff), this.speed);
+                    }
+                }
+            }
         } else {
             // Hit a rock or can't move, pick a valid direction
             this.pickValidDirection(grid);

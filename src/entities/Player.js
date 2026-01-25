@@ -1,4 +1,4 @@
-import { TILE_SIZE, PLAYER, DIRECTIONS } from '../utils/constants.js';
+import { TILE_SIZE, PLAYER, DIRECTIONS, DEATH } from '../utils/constants.js';
 
 export class Player {
     constructor(grid) {
@@ -31,12 +31,45 @@ export class Player {
 
         // Track if player is digging (in contact with dirt)
         this.isDigging = false;
+
+        // Death state
+        this.isDying = false;
+        this.deathTimer = 0;
+        this.deathType = null; // 'enemy' or 'rock'
+
+        // Respawn invincibility
+        this.isInvincible = false;
+        this.invincibilityTimer = 0;
+    }
+
+    /**
+     * Start death animation
+     */
+    startDeath(deathType) {
+        this.isDying = true;
+        this.deathTimer = 0;
+        this.deathType = deathType;
+        this.isMoving = false;
     }
 
     /**
      * Update player state
      */
     update(deltaTime, inputManager, grid) {
+        // Update death animation
+        if (this.isDying) {
+            this.deathTimer += deltaTime;
+            return; // Don't process normal updates
+        }
+
+        // Update invincibility
+        if (this.isInvincible) {
+            this.invincibilityTimer += deltaTime;
+            if (this.invincibilityTimer > DEATH.INVINCIBILITY_TIME) {
+                this.isInvincible = false;
+            }
+        }
+
         // Get input direction
         const inputDirection = inputManager.getDirection();
 

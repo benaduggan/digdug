@@ -5,6 +5,7 @@ import {
     COLORS,
     TILE_TYPES,
     DIRECTIONS,
+    DEATH,
 } from './utils/constants.js';
 
 export class Renderer {
@@ -139,6 +140,19 @@ export class Renderer {
      * Draw the player with walking sprites
      */
     drawPlayer(player) {
+        // Handle death animation
+        if (player.isDying) {
+            this.drawPlayerDeath(player);
+            return;
+        }
+
+        // Flicker during invincibility
+        if (player.isInvincible) {
+            const flickerVisible =
+                Math.floor(player.invincibilityTimer / 100) % 2 === 0;
+            if (!flickerVisible) return; // Skip rendering on flicker-off frames
+        }
+
         const px = player.x;
         const py = player.y;
 
@@ -206,6 +220,43 @@ export class Renderer {
         // Draw pump hose if pumping
         if (player.isPumping && player.pumpTarget) {
             this.drawPumpHose(player, player.pumpTarget);
+        }
+    }
+
+    /**
+     * Draw player death animation
+     */
+    drawPlayerDeath(player) {
+        const progress = player.deathTimer / DEATH.ANIMATION_DURATION;
+        const px = player.x;
+        const py = player.y;
+
+        // Death type determines animation
+        if (player.deathType === 'rock') {
+            // Squish effect - vertical compression
+            this.ctx.save();
+            this.ctx.globalAlpha = 1 - progress;
+            this.ctx.fillStyle = '#3498db';
+            const squishHeight = TILE_SIZE * (1 - progress * 0.8);
+            this.ctx.fillRect(
+                px + 2,
+                py + TILE_SIZE - squishHeight,
+                TILE_SIZE - 4,
+                squishHeight
+            );
+            this.ctx.restore();
+        } else {
+            // Enemy hit - particle explosion
+            this.ctx.save();
+            this.ctx.globalAlpha = 1 - progress;
+            this.ctx.fillStyle = '#3498db';
+            const spread = progress * 8;
+            // 4 particles spreading outward
+            this.ctx.fillRect(px + 6 - spread, py + 6, 4, 4);
+            this.ctx.fillRect(px + 6 + spread, py + 6, 4, 4);
+            this.ctx.fillRect(px + 6, py + 6 - spread, 4, 4);
+            this.ctx.fillRect(px + 6, py + 6 + spread, 4, 4);
+            this.ctx.restore();
         }
     }
 
@@ -425,6 +476,24 @@ export class Renderer {
         this.ctx.fillStyle = color;
         this.ctx.textAlign = align;
         this.ctx.fillText(text, x, y);
+    }
+
+    /**
+     * Render respawning state with "Player 1 Ready" overlay
+     */
+    renderRespawning() {
+        // Note: Game.js should call this.render() first, then this overlay
+        // Overlay "Player 1 Ready" message
+        this.drawText('PLAYER 1', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 10, {
+            size: 10,
+            color: COLORS.TEXT_YELLOW,
+            align: 'center',
+        });
+        this.drawText('READY', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 10, {
+            size: 10,
+            color: COLORS.TEXT_YELLOW,
+            align: 'center',
+        });
     }
 
     /**
