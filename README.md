@@ -28,13 +28,13 @@ npm install digdug-game
 import DigDug from 'digdug-game';
 
 const game = new DigDug({
-  container: document.getElementById('game'),
-  width: 448,
-  height: 448,
-  scale: 2,
-  onGameOver: (score) => console.log('Game Over!', score),
-  onLevelComplete: (level) => console.log('Level Complete!', level),
-  onScoreChange: (score) => console.log('Score:', score)
+    container: document.getElementById('game'),
+    width: 448,
+    height: 448,
+    scale: 2,
+    onGameOver: (score) => console.log('Game Over!', score),
+    onLevelComplete: (level) => console.log('Level Complete!', level),
+    onScoreChange: (score) => console.log('Score:', score),
 });
 
 game.start();
@@ -60,18 +60,22 @@ game.start();
 ## Gameplay
 
 ### Objective
+
 Defeat all enemies on each level by either:
+
 1. Pumping them until they inflate and pop
 2. Dropping rocks on them
 
 ### Enemies
 
 **Pooka** (Red with yellow goggles)
+
 - Can move through dirt (ghosting)
 - Worth 200 points base
 - Common enemy type
 
 **Fygar** (Green dragon)
+
 - Can breathe horizontal fire
 - Faster and more dangerous
 - Worth 400 points base

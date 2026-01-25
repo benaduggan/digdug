@@ -1,40 +1,61 @@
 {
-  "name": "digdug-game",
-  "version": "1.0.0",
-  "description": "A faithful recreation of the classic 1982 Dig Dug arcade game using vanilla JavaScript and HTML5 Canvas",
-  "main": "dist/digdug.js",
-  "module": "dist/digdug.esm.js",
-  "browser": "dist/digdug.umd.js",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "keywords": [
-    "digdug",
-    "dig dug",
-    "arcade",
-    "game",
-    "retro",
-    "html5",
-    "canvas",
-    "javascript",
-    "pixel-art",
-    "namco",
-    "classic-game"
-  ],
-  "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "vite": "^5.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": ""
-  },
-  "files": [
-    "dist",
-    "assets",
-    "README.md"
-  ]
+    "name": "digdug-game",
+    "version": "1.0.0",
+    "description": "A faithful recreation of the classic 1982 Dig Dug arcade game using vanilla JavaScript and HTML5 Canvas",
+    "keywords": [
+        "digdug",
+        "dig dug",
+        "arcade",
+        "game",
+        "retro",
+        "html5",
+        "canvas",
+        "javascript",
+        "pixel-art",
+        "namco",
+        "classic-game"
+    ],
+    "repository": {
+        "type": "git",
+        "url": ""
+    },
+    "license": "MIT",
+    "author": "",
+    "type": "module",
+    "main": "dist/digdug.js",
+    "module": "dist/digdug.esm.js",
+    "browser": "dist/digdug.umd.js",
+    "files": [
+        "dist",
+        "assets",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite",
+        "format": "prettier --write \"**/*.{js,json,md}\"",
+        "format:check": "prettier --check \"**/*.{js,json,md}\"",
+        "lint": "eslint",
+        "prepare": "husky",
+        "preview": "vite preview"
+    },
+    "lint-staged": {
+        "*.{js}": [
+            "eslint --fix",
+            "prettier --write"
+        ],
+        "*.{json,md,css}": [
+            "prettier --write"
+        ]
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.39.2",
+        "eslint-config-prettier": "^10.1.8",
+        "globals": "^17.1.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.2.7",
+        "prettier": "^3.8.1",
+        "prettier-plugin-packagejson": "^3.0.0",
+        "vite": "^5.0.0"
+    }
 }
