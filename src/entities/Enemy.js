@@ -1,111 +1,53 @@
 import { TILE_SIZE, DIRECTIONS } from '../utils/constants.js';
 
+/**
+ * Enemy class - Refactored for cleaner, more maintainable behavior
+ * Phase 1: Basic tunnel movement only
+ */
 export class Enemy {
     constructor(x, y, type, speed, level = 1) {
+        // Position (pixel coordinates)
         this.x = x;
         this.y = y;
+
+        // Type and level
         this.type = type;
-        this.baseSpeed = speed;
-        this.speed = speed + (level - 1) * 0.1; // Increase speed with level
         this.level = level;
 
-        // Movement
+        // Speed (increases with level)
+        this.baseSpeed = speed;
+        this.speed = speed + (level - 1) * 0.1;
+
+        // Movement state
         this.direction = DIRECTIONS.DOWN;
         this.isMoving = true;
-        this.isGhosting = false; // Moving through dirt (ghost mode)
+        this.directionInitialized = false;
 
-        // Ghost mode transformation timer
-        this.ghostModeTimer = 0;
-        this.canGhostMode = false; // Becomes true after 5 seconds
-        this.GHOST_MODE_DELAY = 5000; // 5 seconds before can ghost
-        this.inTunnel = true; // Track if currently in tunnel
-        this.tunnelDirection = null; // Direction of tunnel (horizontal/vertical)
-
-        // Tunnel seeking timeout
-        this.tunnelSeekTimer = 0;
-        this.TUNNEL_SEEK_TIMEOUT = 8000; // 8 seconds
-
-        // AI state
-        this.state = 'roaming'; // roaming, chasing
-        this.targetX = x;
-        this.targetY = y;
-        this.stateTimer = 0;
-        this.directionChangeTimer = 0;
+        // Animation
+        this.animationFrame = 0;
+        this.animationTimer = 0;
 
         // Inflation (when pumped)
         this.isInflating = false;
         this.inflateLevel = 1.0;
         this.inflateTimer = 0;
 
-        // Animation
-        this.animationFrame = 0;
-        this.animationTimer = 0;
-        this.eyeFlashTimer = 0; // For flashing eyes effect in ghost mode
+        // Destruction flag
+        this.isDestroyed = false;
 
         // Distance from player (for scoring)
         this.distanceFromPlayer = 0;
-
-        // Escape behavior (last enemy)
-        this.isLastEnemy = false;
-        this.isEscaping = false;
-        this.hasEscaped = false;
     }
 
     /**
      * Update enemy state
      */
     update(deltaTime, player, grid) {
-        // Check current position - are we in a tunnel?
-        const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
-        const currentlyInTunnel = grid.isEmpty(gx, gy);
-
-        // If we just entered a tunnel from dirt, reset ghost mode timer
-        // BUT only if we're fully in the tunnel (not at the edge in dirt)
-        const actuallyInDirt = grid.isDirt(gx, gy);
-        if (currentlyInTunnel && !this.inTunnel && !actuallyInDirt) {
-            // Just entered tunnel - disable ghost mode for 5 seconds
-            this.ghostModeTimer = 0;
-            this.canGhostMode = false;
-            this.isGhosting = false;
-            this.tunnelSeekTimer = 0; // Start tunnel seek timer
-
-            // Detect tunnel direction (horizontal or vertical)
-            this.tunnelDirection = this.detectTunnelDirection(gx, gy, grid);
-
-            // Immediately pick a valid direction for the tunnel
-            this.pickValidDirection(grid, player);
-
-            // TRANSITION TO CHASING MODE to actively seek player
-            this.state = 'chasing';
-            this.stateTimer = 0;
+        // Initialize direction on first update if needed
+        if (!this.directionInitialized) {
+            this.initializeDirection(grid);
+            this.directionInitialized = true;
         }
-
-        this.inTunnel = currentlyInTunnel;
-
-        // Update ghost mode timer - only when in tunnels
-        // (Ghost mode is for leaving tunnels to move through dirt)
-        if (this.inTunnel && !this.canGhostMode) {
-            this.ghostModeTimer += deltaTime;
-            if (this.ghostModeTimer >= this.GHOST_MODE_DELAY) {
-                this.canGhostMode = true;
-            }
-        }
-
-        // Track time spent in tunnels (tunnel seeking timeout)
-        if (this.inTunnel && !this.canGhostMode) {
-            this.tunnelSeekTimer += deltaTime;
-
-            // After 8 seconds in tunnels, allow ghost mode again
-            if (this.tunnelSeekTimer >= this.TUNNEL_SEEK_TIMEOUT) {
-                this.canGhostMode = true;
-                this.tunnelSeekTimer = 0;
-            }
-        } else {
-            this.tunnelSeekTimer = 0; // Reset when ghosting or not in tunnel
-        }
-
-        // Update AI state
-        this.updateAI(deltaTime, player, grid);
 
         // Update inflation if being pumped
         if (this.isInflating) {
@@ -114,16 +56,11 @@ export class Enemy {
 
         // Move enemy
         if (this.isMoving && !this.isInflating) {
-            this.move(grid, player);
+            this.move(grid);
         }
 
         // Update animation
         this.updateAnimation(deltaTime);
-
-        // Update eye flash animation for ghost mode
-        if (this.isGhosting) {
-            this.eyeFlashTimer += deltaTime;
-        }
 
         // Calculate distance from player for scoring
         if (player) {
@@ -134,374 +71,193 @@ export class Enemy {
     }
 
     /**
-     * Update AI behavior
+     * Move enemy - Phase 1: Simple tunnel bouncing
      */
-    updateAI(deltaTime, player, grid) {
-        // If last enemy, attempt escape
-        if (this.isLastEnemy && !this.isEscaping) {
-            this.startEscape();
-        }
-
-        if (this.isEscaping) {
-            this.escape(grid);
-            return; // Skip normal AI
-        }
-
-        this.stateTimer += deltaTime;
-        this.directionChangeTimer += deltaTime;
-
-        // Switch between roaming and chasing
-        if (this.stateTimer > 3000) {
-            this.state = this.state === 'roaming' ? 'chasing' : 'roaming';
-            this.stateTimer = 0;
-        }
-
-        if (this.state === 'chasing' && player) {
-            this.chasePlayer(player, grid);
-        } else {
-            this.roam(grid, player);
-        }
-    }
-
-    /**
-     * Chase the player
-     */
-    chasePlayer(player, grid) {
-        const dx = player.x - this.x;
-        const dy = player.y - this.y;
-
-        // Choose direction based on larger distance
-        if (Math.abs(dx) > Math.abs(dy)) {
-            this.direction = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
-        } else {
-            this.direction = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
-        }
-    }
-
-    /**
-     * Roam - follow tunnel direction if in tunnel without ghost mode
-     */
-    roam(grid, player = null) {
-        // Random direction changes
-        if (this.directionChangeTimer > 1000 + Math.random() * 1000) {
-            this.pickValidDirection(grid, player);
-            this.directionChangeTimer = 0;
-        }
-    }
-
-    /**
-     * Start escape behavior (last enemy)
-     */
-    startEscape() {
-        this.isEscaping = true;
-        this.direction = DIRECTIONS.UP;
-        this.canGhostMode = true; // Enable ghosting to escape through dirt
-        this.speed = this.baseSpeed * 1.5; // 50% faster when escaping
-    }
-
-    /**
-     * Escape behavior - move upward to top of screen
-     */
-    escape(grid) {
-        // Always move upward toward top edge
-        this.direction = DIRECTIONS.UP;
-
-        // Check if reached top of screen
-        if (this.y <= 0) {
-            this.hasEscaped = true; // Mark for removal
-        }
-    }
-
-    /**
-     * Detect if tunnel is horizontal or vertical
-     */
-    detectTunnelDirection(gx, gy, grid) {
-        const hasLeft = grid.isEmpty(gx - 1, gy);
-        const hasRight = grid.isEmpty(gx + 1, gy);
-        const hasUp = grid.isEmpty(gx, gy - 1);
-        const hasDown = grid.isEmpty(gx, gy + 1);
-
-        const horizontalOpen = hasLeft || hasRight;
-        const verticalOpen = hasUp || hasDown;
-
-        // Determine primary direction based on what's open
-        if (horizontalOpen && !verticalOpen) {
-            return 'horizontal';
-        } else if (verticalOpen && !horizontalOpen) {
-            return 'vertical';
-        } else if (horizontalOpen && verticalOpen) {
-            // Intersection - choose based on current direction
-            if (
-                this.direction === DIRECTIONS.LEFT ||
-                this.direction === DIRECTIONS.RIGHT
-            ) {
-                return 'horizontal';
-            } else {
-                return 'vertical';
-            }
-        }
-
-        return null; // Enclosed, shouldn't happen
-    }
-
-    /**
-     * Move enemy
-     */
-    move(grid, player = null) {
-        // Calculate move speed based on current tile
-        const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
-        const inDirt = grid.isDirt(gx, gy);
-
-        let moveSpeed = this.speed;
-        if (inDirt) {
-            if (this.canGhostMode) {
-                // Can ghost through dirt at reduced speed
-                moveSpeed = this.speed * 0.6;
-            } else {
-                // Can't ghost through dirt - don't move
-                return;
-            }
-        }
-
-        // Before moving, check if the destination is valid
+    move(grid) {
+        // Calculate new position based on direction
         let newX = this.x;
         let newY = this.y;
 
         switch (this.direction) {
             case DIRECTIONS.UP:
-                newY -= moveSpeed;
+                newY -= this.speed;
                 break;
             case DIRECTIONS.DOWN:
-                newY += moveSpeed;
+                newY += this.speed;
                 break;
             case DIRECTIONS.LEFT:
-                newX -= moveSpeed;
+                newX -= this.speed;
                 break;
             case DIRECTIONS.RIGHT:
-                newX += moveSpeed;
+                newX += this.speed;
                 break;
-        }
-
-        // Check boundaries
-        if (newX < 0 || newX > grid.width * TILE_SIZE - TILE_SIZE) {
-            this.direction =
-                this.direction === DIRECTIONS.LEFT
-                    ? DIRECTIONS.RIGHT
-                    : DIRECTIONS.LEFT;
-            return;
-        }
-        if (newY < 0 || newY > grid.height * TILE_SIZE - TILE_SIZE) {
-            this.direction =
-                this.direction === DIRECTIONS.UP
-                    ? DIRECTIONS.DOWN
-                    : DIRECTIONS.UP;
-            return;
         }
 
         // Check if can move to new position
-        let canMove = this.canMoveToPosition(newX, newY, grid);
-
-        // Additional check: if we can't ghost mode, we can't move into dirt
-        if (canMove && !this.canGhostMode) {
-            const { x: newGx, y: newGy } = grid.pixelToGrid(newX, newY);
-            const nextTileIsDirt = grid.isDirt(newGx, newGy);
-
-            // If next tile is dirt and we can't ghost, don't move
-            if (nextTileIsDirt) {
-                canMove = false;
-                // Pick a new direction that stays in tunnels
-                this.pickValidDirection(grid, player);
-                return; // Don't move this frame
-            }
-        }
+        const canMove = this.canMoveToPosition(newX, newY, grid);
 
         if (canMove) {
+            // Move to new position
             this.x = newX;
             this.y = newY;
 
-            // Update isGhosting based on NEW position after movement
-            const { x: currentGx, y: currentGy } = grid.pixelToGrid(
-                this.x,
-                this.y
-            );
-            const currentlyInDirt = grid.isDirt(currentGx, currentGy);
-            const currentlyInTunnel = grid.isEmpty(currentGx, currentGy);
-
-            // Set ghosting state based on actual current position
-            this.isGhosting = currentlyInDirt && this.canGhostMode;
-
-            // SNAP TO GRID when in tunnels (not ghosting)
-            // This ensures enemies stay centered in tunnels and don't visually overlap dirt
-            // Only apply grid snapping if:
-            // 1. Not ghosting (moving through dirt)
-            // 2. Currently in a tunnel (empty tile)
-            if (!this.isGhosting && currentlyInTunnel) {
-                // When moving horizontally, align vertically
-                if (
-                    this.direction === DIRECTIONS.LEFT ||
-                    this.direction === DIRECTIONS.RIGHT
-                ) {
-                    const centerY = this.y + TILE_SIZE / 2;
-                    const gridY = Math.floor(centerY / TILE_SIZE);
-                    const targetY = gridY * TILE_SIZE;
-                    const diff = targetY - this.y;
-                    if (Math.abs(diff) > 0) {
-                        const snapAmount =
-                            Math.sign(diff) *
-                            Math.min(Math.abs(diff), this.speed);
-                        const testY = this.y + snapAmount;
-
-                        // Only snap if the snapped position is still in a tunnel
-                        const testCenterY = testY + TILE_SIZE / 2;
-                        const testGridY = Math.floor(testCenterY / TILE_SIZE);
-                        if (grid.isEmpty(currentGx, testGridY)) {
-                            this.y = testY;
-                        }
-                    }
-                }
-
-                // When moving vertically, align horizontally
-                if (
-                    this.direction === DIRECTIONS.UP ||
-                    this.direction === DIRECTIONS.DOWN
-                ) {
-                    const centerX = this.x + TILE_SIZE / 2;
-                    const gridX = Math.floor(centerX / TILE_SIZE);
-                    const targetX = gridX * TILE_SIZE;
-                    const diff = targetX - this.x;
-                    if (Math.abs(diff) > 0) {
-                        const snapAmount =
-                            Math.sign(diff) *
-                            Math.min(Math.abs(diff), this.speed);
-                        const testX = this.x + snapAmount;
-
-                        // Only snap if the snapped position is still in a tunnel
-                        const testCenterX = testX + TILE_SIZE / 2;
-                        const testGridX = Math.floor(testCenterX / TILE_SIZE);
-                        if (grid.isEmpty(testGridX, currentGy)) {
-                            this.x = testX;
-                        }
-                    }
-                }
-            }
+            // Apply grid snapping for tunnel centering
+            this.applyGridSnapping(grid);
         } else {
-            // Hit a rock or can't move, pick a valid direction
-            this.pickValidDirection(grid, player);
+            // Hit a wall or invalid tile, reverse direction
+            this.reverseDirection();
         }
     }
 
     /**
      * Check if enemy can move to position
+     * Phase 1: Only allow movement in empty tunnels, block rocks
      */
     canMoveToPosition(x, y, grid) {
-        const { x: gx, y: gy } = grid.pixelToGrid(x, y);
+        // Check multiple points on the enemy sprite to ensure it's fully in tunnel
+        // We'll check center, and points near each edge based on movement direction
+        const centerX = x + TILE_SIZE / 2;
+        const centerY = y + TILE_SIZE / 2;
+        const { x: gxCenter, y: gyCenter } = grid.pixelToGrid(centerX, centerY);
 
-        // Enemies cannot move through rocks
-        return !grid.isRock(gx, gy);
+        // Always check center first
+        if (
+            grid.isRock(gxCenter, gyCenter) ||
+            !grid.isEmpty(gxCenter, gyCenter)
+        ) {
+            return false;
+        }
+
+        let checkX = centerX;
+        let checkY = centerY;
+
+        switch (this.direction) {
+            case DIRECTIONS.UP:
+                checkY = y;
+                break;
+            case DIRECTIONS.DOWN:
+                checkY = y + TILE_SIZE;
+                break;
+            case DIRECTIONS.LEFT:
+                checkX = x;
+                break;
+            case DIRECTIONS.RIGHT:
+                checkX = x + TILE_SIZE;
+                break;
+        }
+
+        const { x: gxEdge, y: gyEdge } = grid.pixelToGrid(checkX, checkY);
+
+        // Cannot move if leading edge would be in rock or dirt
+        if (grid.isRock(gxEdge, gyEdge) || !grid.isEmpty(gxEdge, gyEdge)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
-     * Pick a valid direction based on what's available
+     * Apply grid snapping to keep enemy centered in tunnels
      */
-    pickValidDirection(grid, player = null) {
+    applyGridSnapping(grid) {
         const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
-        const validDirections = [];
 
-        // In tunnel without ghost mode: can move in any direction that has a tunnel
-        // This allows enemies to turn at intersections
-        if (this.inTunnel && !this.canGhostMode) {
-            // Check all four directions for tunnels
-            if (grid.isEmpty(gx, gy - 1) && !grid.isRock(gx, gy - 1)) {
-                validDirections.push(DIRECTIONS.UP);
-            }
-            if (grid.isEmpty(gx, gy + 1) && !grid.isRock(gx, gy + 1)) {
-                validDirections.push(DIRECTIONS.DOWN);
-            }
-            if (grid.isEmpty(gx - 1, gy) && !grid.isRock(gx - 1, gy)) {
-                validDirections.push(DIRECTIONS.LEFT);
-            }
-            if (grid.isEmpty(gx + 1, gy) && !grid.isRock(gx + 1, gy)) {
-                validDirections.push(DIRECTIONS.RIGHT);
-            }
+        // Only snap if currently in a tunnel
+        if (!grid.isEmpty(gx, gy)) {
+            return;
+        }
 
-            // If we have a player reference and we're chasing, prefer direction toward player
-            if (
-                player &&
-                this.state === 'chasing' &&
-                validDirections.length > 0
-            ) {
-                const dx = player.x - this.x;
-                const dy = player.y - this.y;
+        // When moving horizontally, align vertically to grid center
+        if (
+            this.direction === DIRECTIONS.LEFT ||
+            this.direction === DIRECTIONS.RIGHT
+        ) {
+            const centerY = this.y + TILE_SIZE / 2;
+            const gridY = Math.floor(centerY / TILE_SIZE);
+            const targetY = gridY * TILE_SIZE;
+            const diff = targetY - this.y;
 
-                // Determine preferred directions based on player position
-                let preferredDirection = null;
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    preferredDirection =
-                        dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
-                } else {
-                    preferredDirection =
-                        dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+            if (Math.abs(diff) > 0) {
+                const snapAmount =
+                    Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
+                const testY = this.y + snapAmount;
+
+                // Only snap if the snapped position is still in a tunnel
+                const testCenterY = testY + TILE_SIZE / 2;
+                const testGridY = Math.floor(testCenterY / TILE_SIZE);
+                if (grid.isEmpty(gx, testGridY)) {
+                    this.y = testY;
                 }
-
-                // If preferred direction is valid, use it
-                if (validDirections.includes(preferredDirection)) {
-                    this.direction = preferredDirection;
-                    return;
-                }
-
-                // Otherwise try secondary direction
-                let secondaryDirection = null;
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    secondaryDirection =
-                        dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
-                } else {
-                    secondaryDirection =
-                        dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
-                }
-
-                if (validDirections.includes(secondaryDirection)) {
-                    this.direction = secondaryDirection;
-                    return;
-                }
-            }
-        } else {
-            // Free roaming - check all directions (can go through dirt if can ghost)
-            if (
-                !grid.isRock(gx, gy - 1) &&
-                (grid.isEmpty(gx, gy - 1) ||
-                    (this.canGhostMode && grid.isDirt(gx, gy - 1)))
-            ) {
-                validDirections.push(DIRECTIONS.UP);
-            }
-            if (
-                !grid.isRock(gx, gy + 1) &&
-                (grid.isEmpty(gx, gy + 1) ||
-                    (this.canGhostMode && grid.isDirt(gx, gy + 1)))
-            ) {
-                validDirections.push(DIRECTIONS.DOWN);
-            }
-            if (
-                !grid.isRock(gx - 1, gy) &&
-                (grid.isEmpty(gx - 1, gy) ||
-                    (this.canGhostMode && grid.isDirt(gx - 1, gy)))
-            ) {
-                validDirections.push(DIRECTIONS.LEFT);
-            }
-            if (
-                !grid.isRock(gx + 1, gy) &&
-                (grid.isEmpty(gx + 1, gy) ||
-                    (this.canGhostMode && grid.isDirt(gx + 1, gy)))
-            ) {
-                validDirections.push(DIRECTIONS.RIGHT);
             }
         }
 
-        // Pick a random valid direction as fallback
-        if (validDirections.length > 0) {
-            this.direction =
-                validDirections[
-                    Math.floor(Math.random() * validDirections.length)
-                ];
+        // When moving vertically, align horizontally to grid center
+        if (
+            this.direction === DIRECTIONS.UP ||
+            this.direction === DIRECTIONS.DOWN
+        ) {
+            const centerX = this.x + TILE_SIZE / 2;
+            const gridX = Math.floor(centerX / TILE_SIZE);
+            const targetX = gridX * TILE_SIZE;
+            const diff = targetX - this.x;
+
+            if (Math.abs(diff) > 0) {
+                const snapAmount =
+                    Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
+                const testX = this.x + snapAmount;
+
+                // Only snap if the snapped position is still in a tunnel
+                const testCenterX = testX + TILE_SIZE / 2;
+                const testGridX = Math.floor(testCenterX / TILE_SIZE);
+                if (grid.isEmpty(testGridX, gy)) {
+                    this.x = testX;
+                }
+            }
+        }
+    }
+
+    /**
+     * Reverse current direction (bounce back)
+     */
+    reverseDirection() {
+        switch (this.direction) {
+            case DIRECTIONS.UP:
+                this.direction = DIRECTIONS.DOWN;
+                break;
+            case DIRECTIONS.DOWN:
+                this.direction = DIRECTIONS.UP;
+                break;
+            case DIRECTIONS.LEFT:
+                this.direction = DIRECTIONS.RIGHT;
+                break;
+            case DIRECTIONS.RIGHT:
+                this.direction = DIRECTIONS.LEFT;
+                break;
+        }
+    }
+
+    /**
+     * Initialize direction based on tunnel orientation
+     */
+    initializeDirection(grid) {
+        const { x: gx, y: gy } = grid.pixelToGrid(
+            this.x + TILE_SIZE / 2,
+            this.y + TILE_SIZE / 2
+        );
+
+        // Check all four directions to see which ones have tunnels
+        const hasLeft = grid.isEmpty(gx - 1, gy);
+        const hasRight = grid.isEmpty(gx + 1, gy);
+        const hasUp = grid.isEmpty(gx, gy - 1);
+        const hasDown = grid.isEmpty(gx, gy + 1);
+
+        // Prefer horizontal movement if horizontal tunnel
+        if (hasLeft || hasRight) {
+            this.direction = hasRight ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+        }
+        // Otherwise use vertical movement
+        else if (hasUp || hasDown) {
+            this.direction = hasDown ? DIRECTIONS.DOWN : DIRECTIONS.UP;
         }
     }
 
