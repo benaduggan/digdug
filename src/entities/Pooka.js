@@ -10,13 +10,13 @@ export class Pooka extends Enemy {
     /**
      * Pookas are better at ghosting through dirt
      */
-    move(grid) {
+    move(grid, player = null) {
         const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
         const inDirt = grid.isDirt(gx, gy);
 
         // Pookas move at same speed through dirt and tunnels (good ghosters)
         this.isGhosting = inDirt;
 
-        super.move(grid);
+        super.move(grid, player);
     }
 }

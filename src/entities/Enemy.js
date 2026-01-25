@@ -2,7 +2,7 @@ import { TILE_SIZE, DIRECTIONS } from '../utils/constants.js';
 
 /**
  * Enemy class - Refactored for cleaner, more maintainable behavior
- * Phase 1: Basic tunnel movement only
+ * Phase 2: Tunnel movement with player tracking
  */
 export class Enemy {
     constructor(x, y, type, speed, level = 1) {
@@ -22,6 +22,19 @@ export class Enemy {
         this.direction = DIRECTIONS.DOWN;
         this.isMoving = true;
         this.directionInitialized = false;
+
+        // AI state
+        this.state = 'roaming'; // 'roaming' or 'chasing'
+        this.stateTimer = 0;
+        this.directionChangeTimer = 0;
+
+        // Track last grid position to detect when we enter a new tile
+        this.lastGridX = -1;
+        this.lastGridY = -1;
+
+        // Track tiles traveled in current direction to prevent oscillation
+        this.tilesTraveledInDirection = 0;
+        this.minTilesBeforeReverse = 2; // Must travel at least 2 tiles before reversing
 
         // Animation
         this.animationFrame = 0;
@@ -47,6 +60,13 @@ export class Enemy {
         if (!this.directionInitialized) {
             this.initializeDirection(grid);
             this.directionInitialized = true;
+            // Initialize last grid position
+            const { x: gx, y: gy } = grid.pixelToGrid(
+                this.x + TILE_SIZE / 2,
+                this.y + TILE_SIZE / 2
+            );
+            this.lastGridX = gx;
+            this.lastGridY = gy;
         }
 
         // Update inflation if being pumped
@@ -54,9 +74,14 @@ export class Enemy {
             this.updateInflation(deltaTime);
         }
 
+        // Update AI state based on player distance
+        if (player) {
+            this.updateAI(deltaTime, player, grid);
+        }
+
         // Move enemy
         if (this.isMoving && !this.isInflating) {
-            this.move(grid);
+            this.move(grid, player);
         }
 
         // Update animation
@@ -71,9 +96,67 @@ export class Enemy {
     }
 
     /**
-     * Move enemy - Phase 1: Simple tunnel bouncing
+     * Update AI behavior
      */
-    move(grid) {
+    updateAI(deltaTime, player, grid) {
+        // Calculate distance to player
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        const distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
+
+        // State transitions based on distance
+        // Chase when player is within 8 tiles (~half the grid width)
+        // Roam when player is beyond 10 tiles
+        const CHASE_DISTANCE = TILE_SIZE * 8;
+        const ROAM_DISTANCE = TILE_SIZE * 10;
+
+        if (distanceToPlayer <= CHASE_DISTANCE && this.state !== 'chasing') {
+            this.state = 'chasing';
+            this.stateTimer = 0;
+        } else if (
+            distanceToPlayer > ROAM_DISTANCE &&
+            this.state !== 'roaming'
+        ) {
+            this.state = 'roaming';
+            this.stateTimer = 0;
+        }
+
+        // Update timers
+        this.stateTimer += deltaTime;
+        this.directionChangeTimer += deltaTime;
+    }
+
+    /**
+     * Move enemy through tunnels
+     */
+    move(grid, player = null) {
+        // Get current grid position
+        const centerX = this.x + TILE_SIZE / 2;
+        const centerY = this.y + TILE_SIZE / 2;
+        const { x: gx, y: gy } = grid.pixelToGrid(centerX, centerY);
+
+        // Check if we've moved to a new grid cell
+        const enteredNewTile = gx !== this.lastGridX || gy !== this.lastGridY;
+
+        // When entering a new tile, consider changing direction
+        if (enteredNewTile) {
+            this.lastGridX = gx;
+            this.lastGridY = gy;
+            this.tilesTraveledInDirection++;
+
+            // At a new tile, decide direction based on AI state
+            if (player && this.state === 'chasing') {
+                this.decideDirectionAtTile(player, grid, gx, gy);
+            } else if (this.state === 'roaming') {
+                this.roamAtTile(grid, gx, gy);
+            }
+        } else if (player && this.state === 'chasing') {
+            // Even if we didn't enter a new tile, check if we should turn
+            // This handles the case where we're passing through an intersection
+            // and need to turn toward the player
+            this.checkForBetterDirection(player, grid, gx, gy);
+        }
+
         // Calculate new position based on direction
         let newX = this.x;
         let newY = this.y;
@@ -93,8 +176,13 @@ export class Enemy {
                 break;
         }
 
-        // Check if can move to new position
-        const canMove = this.canMoveToPosition(newX, newY, grid);
+        // Check if can move to new position (leading edge check)
+        const canMove = this.canMoveInDirection(
+            newX,
+            newY,
+            this.direction,
+            grid
+        );
 
         if (canMove) {
             // Move to new position
@@ -104,52 +192,333 @@ export class Enemy {
             // Apply grid snapping for tunnel centering
             this.applyGridSnapping(grid);
         } else {
-            // Hit a wall or invalid tile, reverse direction
-            this.reverseDirection();
+            // Hit a wall, snap to grid and pick new direction
+            this.snapToGrid(grid);
+            this.pickValidDirection(grid, player, gx, gy);
+            this.tilesTraveledInDirection = 0; // Reset counter when forced to change direction
         }
     }
 
     /**
-     * Check if enemy can move to position
-     * Phase 1: Only allow movement in empty tunnels, block rocks
+     * Check if there's a better direction toward the player while passing through a tile
+     * Only triggers at intersections (3+ valid directions)
      */
-    canMoveToPosition(x, y, grid) {
-        // Check multiple points on the enemy sprite to ensure it's fully in tunnel
-        // We'll check center, and points near each edge based on movement direction
-        const centerX = x + TILE_SIZE / 2;
-        const centerY = y + TILE_SIZE / 2;
-        const { x: gxCenter, y: gyCenter } = grid.pixelToGrid(centerX, centerY);
+    checkForBetterDirection(player, grid, gx, gy) {
+        // Get valid directions FIRST
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
 
-        // Always check center first
-        if (
-            grid.isRock(gxCenter, gyCenter) ||
-            !grid.isEmpty(gxCenter, gyCenter)
-        ) {
+        // Only consider turns at actual intersections (3+ directions)
+        // This prevents turning in straight tunnels or corners
+        if (validDirections.length < 3) {
+            return;
+        }
+
+        // If current direction is not valid, don't try to change - let canMoveInDirection handle it
+        if (!validDirections.includes(this.direction)) {
+            return;
+        }
+
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+
+        // Determine preferred direction toward player
+        let preferredDirection;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            preferredDirection = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+        } else {
+            preferredDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+        }
+
+        // If we're already going the preferred direction, no change needed
+        if (this.direction === preferredDirection) {
+            return;
+        }
+
+        // Check if preferred direction is actually valid (has a tunnel)
+        if (!validDirections.includes(preferredDirection)) {
+            return; // Can't turn toward player from this intersection
+        }
+
+        // Check if turning would be a perpendicular turn
+        const isCurrentHorizontal =
+            this.direction === DIRECTIONS.LEFT ||
+            this.direction === DIRECTIONS.RIGHT;
+        const isPreferredHorizontal =
+            preferredDirection === DIRECTIONS.LEFT ||
+            preferredDirection === DIRECTIONS.RIGHT;
+        const isPerpendicular = isCurrentHorizontal !== isPreferredHorizontal;
+
+        // Calculate alignment - must be very close to tile center
+        const tileCenterX = gx * TILE_SIZE;
+        const tileCenterY = gy * TILE_SIZE;
+
+        if (isPerpendicular) {
+            // For perpendicular turns, must be perfectly aligned with tile center
+            let alignmentError;
+            if (isCurrentHorizontal) {
+                alignmentError = Math.abs(this.x - tileCenterX);
+            } else {
+                alignmentError = Math.abs(this.y - tileCenterY);
+            }
+            // Very tight tolerance - only turn when essentially at tile center
+            const tolerance = this.speed;
+
+            if (alignmentError <= tolerance) {
+                this.direction = preferredDirection;
+                this.tilesTraveledInDirection = 0;
+                // Snap BOTH axes to tile position for clean turn
+                this.x = tileCenterX;
+                this.y = tileCenterY;
+            }
+        } else {
+            // Non-perpendicular (reversal) - only allow if we've traveled enough tiles
+            if (this.tilesTraveledInDirection >= this.minTilesBeforeReverse) {
+                this.direction = preferredDirection;
+                this.tilesTraveledInDirection = 0;
+            }
+        }
+    }
+
+    /**
+     * Decide which direction to go when entering a new tile (chasing mode)
+     */
+    decideDirectionAtTile(player, grid, gx, gy) {
+        // Get valid tunnel directions from this tile FIRST
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
+
+        // If no valid directions, keep current (will be handled by wall collision)
+        if (validDirections.length === 0) {
+            return;
+        }
+
+        // If only one valid direction, take it (dead end, must go back)
+        if (validDirections.length === 1) {
+            this.direction = validDirections[0];
+            return;
+        }
+
+        // KEY INSIGHT: Only make decisions at intersections (3+ directions)
+        // or when current direction is invalid
+        // In a straight tunnel (2 directions), just keep going
+        const currentIsValid = validDirections.includes(this.direction);
+        const oppositeDirection = this.getOppositeDirection(this.direction);
+
+        if (validDirections.length === 2 && currentIsValid) {
+            // In a straight tunnel or corner - just keep going unless blocked
+            return;
+        }
+
+        // At an intersection (3+ directions) or current direction invalid
+        // Now we can make a smart decision
+
+        // Filter out dead-end directions (1-tile stubs)
+        const viableDirections = validDirections.filter((d) =>
+            this.isViableDirection(grid, gx, gy, d)
+        );
+        const directionsToConsider =
+            viableDirections.length > 0 ? viableDirections : validDirections;
+
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+
+        // Determine preferred directions based on player position
+        let primaryDirection, secondaryDirection;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            primaryDirection = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+            secondaryDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+        } else {
+            primaryDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+            secondaryDirection = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+        }
+
+        // Try primary direction first (if viable)
+        if (directionsToConsider.includes(primaryDirection)) {
+            this.direction = primaryDirection;
+            return;
+        }
+
+        // Try secondary direction (if viable)
+        if (directionsToConsider.includes(secondaryDirection)) {
+            this.direction = secondaryDirection;
+            return;
+        }
+
+        // Keep current direction if still viable
+        if (directionsToConsider.includes(this.direction)) {
+            return;
+        }
+
+        // Pick any direction that isn't reversing
+        const nonReverseDirections = directionsToConsider.filter(
+            (d) => d !== oppositeDirection
+        );
+        if (nonReverseDirections.length > 0) {
+            this.direction = nonReverseDirections[0];
+        } else if (directionsToConsider.length > 0) {
+            this.direction = directionsToConsider[0];
+        }
+    }
+
+    /**
+     * Get the opposite direction
+     */
+    getOppositeDirection(direction) {
+        switch (direction) {
+            case DIRECTIONS.UP:
+                return DIRECTIONS.DOWN;
+            case DIRECTIONS.DOWN:
+                return DIRECTIONS.UP;
+            case DIRECTIONS.LEFT:
+                return DIRECTIONS.RIGHT;
+            case DIRECTIONS.RIGHT:
+                return DIRECTIONS.LEFT;
+            default:
+                return direction;
+        }
+    }
+
+    /**
+     * Check if a direction leads to a dead end within 5 tiles
+     * Returns true if direction is viable (leads somewhere useful)
+     */
+    isViableDirection(grid, gx, gy, direction) {
+        const maxDepth = 5;
+        let currentGx = gx;
+        let currentGy = gy;
+        let currentDir = direction;
+
+        for (let depth = 0; depth < maxDepth; depth++) {
+            // Move to next tile in current direction
+            let nextGx = currentGx;
+            let nextGy = currentGy;
+
+            switch (currentDir) {
+                case DIRECTIONS.UP:
+                    nextGy--;
+                    break;
+                case DIRECTIONS.DOWN:
+                    nextGy++;
+                    break;
+                case DIRECTIONS.LEFT:
+                    nextGx--;
+                    break;
+                case DIRECTIONS.RIGHT:
+                    nextGx++;
+                    break;
+            }
+
+            // Check if next tile is valid
+            if (!grid.isEmpty(nextGx, nextGy) || grid.isRock(nextGx, nextGy)) {
+                // Hit a wall - this path is a dead end
+                return false;
+            }
+
+            // Check exits from this tile (excluding the way we came)
+            const oppositeDir = this.getOppositeDirection(currentDir);
+            const tileDirections = this.getValidDirectionsFromTile(
+                grid,
+                nextGx,
+                nextGy
+            );
+            const exits = tileDirections.filter((d) => d !== oppositeDir);
+
+            // If there are multiple exits, this is an intersection - path is viable
+            if (exits.length > 1) {
+                return true;
+            }
+
+            // If there's exactly one exit, continue down that path
+            if (exits.length === 1) {
+                currentGx = nextGx;
+                currentGy = nextGy;
+                currentDir = exits[0];
+                continue;
+            }
+
+            // No exits (other than back) - dead end
             return false;
         }
 
-        let checkX = centerX;
-        let checkY = centerY;
+        // Reached max depth without finding dead end or intersection
+        // Consider it viable (path continues beyond our search)
+        return true;
+    }
 
-        switch (this.direction) {
+    /**
+     * Roam behavior when entering a new tile
+     */
+    roamAtTile(grid, gx, gy) {
+        // Only change direction occasionally
+        if (this.directionChangeTimer < 1000 + Math.random() * 1000) {
+            return;
+        }
+        this.directionChangeTimer = 0;
+
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
+        if (validDirections.length > 0) {
+            this.direction =
+                validDirections[
+                    Math.floor(Math.random() * validDirections.length)
+                ];
+        }
+    }
+
+    /**
+     * Get valid directions (tunnel tiles) from a specific grid position
+     */
+    getValidDirectionsFromTile(grid, gx, gy) {
+        const validDirections = [];
+
+        if (grid.isEmpty(gx, gy - 1) && !grid.isRock(gx, gy - 1)) {
+            validDirections.push(DIRECTIONS.UP);
+        }
+        if (grid.isEmpty(gx, gy + 1) && !grid.isRock(gx, gy + 1)) {
+            validDirections.push(DIRECTIONS.DOWN);
+        }
+        if (grid.isEmpty(gx - 1, gy) && !grid.isRock(gx - 1, gy)) {
+            validDirections.push(DIRECTIONS.LEFT);
+        }
+        if (grid.isEmpty(gx + 1, gy) && !grid.isRock(gx + 1, gy)) {
+            validDirections.push(DIRECTIONS.RIGHT);
+        }
+
+        return validDirections;
+    }
+
+    /**
+     * Check if enemy can move in a direction (leading edge collision check)
+     */
+    canMoveInDirection(x, y, direction, grid) {
+        // Check the leading edge based on movement direction
+        let checkX, checkY;
+
+        switch (direction) {
             case DIRECTIONS.UP:
+                checkX = x + TILE_SIZE / 2;
                 checkY = y;
                 break;
             case DIRECTIONS.DOWN:
-                checkY = y + TILE_SIZE;
+                checkX = x + TILE_SIZE / 2;
+                checkY = y + TILE_SIZE - 1;
                 break;
             case DIRECTIONS.LEFT:
                 checkX = x;
+                checkY = y + TILE_SIZE / 2;
                 break;
             case DIRECTIONS.RIGHT:
-                checkX = x + TILE_SIZE;
+                checkX = x + TILE_SIZE - 1;
+                checkY = y + TILE_SIZE / 2;
                 break;
+            default:
+                checkX = x + TILE_SIZE / 2;
+                checkY = y + TILE_SIZE / 2;
         }
 
-        const { x: gxEdge, y: gyEdge } = grid.pixelToGrid(checkX, checkY);
+        const { x: gx, y: gy } = grid.pixelToGrid(checkX, checkY);
 
-        // Cannot move if leading edge would be in rock or dirt
-        if (grid.isRock(gxEdge, gyEdge) || !grid.isEmpty(gxEdge, gyEdge)) {
+        // Cannot move into rocks or dirt
+        if (grid.isRock(gx, gy) || !grid.isEmpty(gx, gy)) {
             return false;
         }
 
@@ -157,10 +526,57 @@ export class Enemy {
     }
 
     /**
+     * Snap position to align with grid
+     */
+    snapToGrid(grid) {
+        const centerX = this.x + TILE_SIZE / 2;
+        const centerY = this.y + TILE_SIZE / 2;
+        const { x: gx, y: gy } = grid.pixelToGrid(centerX, centerY);
+
+        this.x = gx * TILE_SIZE;
+        this.y = gy * TILE_SIZE;
+    }
+
+    /**
+     * Pick a valid direction when hitting a wall
+     */
+    pickValidDirection(grid, player, gx, gy) {
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
+
+        if (validDirections.length === 0) return;
+
+        // If chasing, prefer direction toward player
+        if (player && this.state === 'chasing') {
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+
+            let preferredDirection;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                preferredDirection =
+                    dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+            } else {
+                preferredDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+            }
+
+            if (validDirections.includes(preferredDirection)) {
+                this.direction = preferredDirection;
+                return;
+            }
+        }
+
+        // Pick random valid direction
+        this.direction =
+            validDirections[Math.floor(Math.random() * validDirections.length)];
+    }
+
+    /**
      * Apply grid snapping to keep enemy centered in tunnels
      */
     applyGridSnapping(grid) {
-        const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
+        const { x: gx, y: gy } = grid.pixelToGrid(
+            this.x + TILE_SIZE / 2,
+            this.y + TILE_SIZE / 2
+        );
 
         // Only snap if currently in a tunnel
         if (!grid.isEmpty(gx, gy)) {
@@ -172,22 +588,13 @@ export class Enemy {
             this.direction === DIRECTIONS.LEFT ||
             this.direction === DIRECTIONS.RIGHT
         ) {
-            const centerY = this.y + TILE_SIZE / 2;
-            const gridY = Math.floor(centerY / TILE_SIZE);
-            const targetY = gridY * TILE_SIZE;
+            const targetY = gy * TILE_SIZE;
             const diff = targetY - this.y;
 
             if (Math.abs(diff) > 0) {
                 const snapAmount =
                     Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
-                const testY = this.y + snapAmount;
-
-                // Only snap if the snapped position is still in a tunnel
-                const testCenterY = testY + TILE_SIZE / 2;
-                const testGridY = Math.floor(testCenterY / TILE_SIZE);
-                if (grid.isEmpty(gx, testGridY)) {
-                    this.y = testY;
-                }
+                this.y += snapAmount;
             }
         }
 
@@ -196,43 +603,14 @@ export class Enemy {
             this.direction === DIRECTIONS.UP ||
             this.direction === DIRECTIONS.DOWN
         ) {
-            const centerX = this.x + TILE_SIZE / 2;
-            const gridX = Math.floor(centerX / TILE_SIZE);
-            const targetX = gridX * TILE_SIZE;
+            const targetX = gx * TILE_SIZE;
             const diff = targetX - this.x;
 
             if (Math.abs(diff) > 0) {
                 const snapAmount =
                     Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
-                const testX = this.x + snapAmount;
-
-                // Only snap if the snapped position is still in a tunnel
-                const testCenterX = testX + TILE_SIZE / 2;
-                const testGridX = Math.floor(testCenterX / TILE_SIZE);
-                if (grid.isEmpty(testGridX, gy)) {
-                    this.x = testX;
-                }
+                this.x += snapAmount;
             }
-        }
-    }
-
-    /**
-     * Reverse current direction (bounce back)
-     */
-    reverseDirection() {
-        switch (this.direction) {
-            case DIRECTIONS.UP:
-                this.direction = DIRECTIONS.DOWN;
-                break;
-            case DIRECTIONS.DOWN:
-                this.direction = DIRECTIONS.UP;
-                break;
-            case DIRECTIONS.LEFT:
-                this.direction = DIRECTIONS.RIGHT;
-                break;
-            case DIRECTIONS.RIGHT:
-                this.direction = DIRECTIONS.LEFT;
-                break;
         }
     }
 
@@ -245,19 +623,17 @@ export class Enemy {
             this.y + TILE_SIZE / 2
         );
 
-        // Check all four directions to see which ones have tunnels
-        const hasLeft = grid.isEmpty(gx - 1, gy);
-        const hasRight = grid.isEmpty(gx + 1, gy);
-        const hasUp = grid.isEmpty(gx, gy - 1);
-        const hasDown = grid.isEmpty(gx, gy + 1);
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
 
-        // Prefer horizontal movement if horizontal tunnel
-        if (hasLeft || hasRight) {
-            this.direction = hasRight ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
-        }
-        // Otherwise use vertical movement
-        else if (hasUp || hasDown) {
-            this.direction = hasDown ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+        // Prefer horizontal movement
+        if (validDirections.includes(DIRECTIONS.RIGHT)) {
+            this.direction = DIRECTIONS.RIGHT;
+        } else if (validDirections.includes(DIRECTIONS.LEFT)) {
+            this.direction = DIRECTIONS.LEFT;
+        } else if (validDirections.includes(DIRECTIONS.DOWN)) {
+            this.direction = DIRECTIONS.DOWN;
+        } else if (validDirections.includes(DIRECTIONS.UP)) {
+            this.direction = DIRECTIONS.UP;
         }
     }
 
@@ -277,9 +653,8 @@ export class Enemy {
      */
     updateInflation(deltaTime) {
         this.inflateTimer += deltaTime;
-        this.inflateLevel = 1.0 + this.inflateTimer / 1000; // Grow over time
+        this.inflateLevel = 1.0 + this.inflateTimer / 1000;
 
-        // Pop when fully inflated
         if (this.inflateLevel >= 2.0) {
             this.pop();
         }
@@ -289,7 +664,6 @@ export class Enemy {
      * Enemy pops (dies)
      */
     pop() {
-        // Mark for removal
         this.isDestroyed = true;
     }
 

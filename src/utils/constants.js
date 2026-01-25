@@ -47,12 +47,12 @@ export const ENEMY_TYPES = {
 
 export const ENEMY = {
     POOKA: {
-        SPEED: 1.1, // Increased from 0.8 for better gameplay
+        SPEED: 0.7, // Decreased for better control
         POINTS: 200,
         GHOST_SPEED: 0.5, // Speed when moving through dirt
     },
     FYGAR: {
-        SPEED: 1.0, // Increased from 0.7 for better gameplay
+        SPEED: 0.6, // Decreased for better control
         POINTS: 400,
         GHOST_SPEED: 0.4,
         FIRE_RANGE: 48, // pixels
