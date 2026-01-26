@@ -56,7 +56,8 @@ export class Enemy {
         this.canGhostMode = false;
         this.isGhosting = false;
         this.ghostingDuration = 0; // How long we've been ghosting
-        this.GHOST_MODE_DELAY = 6000; // 6 seconds before ghost mode available
+        // Vary ghost mode delay by ~0.5s per enemy to stagger activation
+        this.GHOST_MODE_DELAY = 6000 + (Math.random() - 0.5) * 2000; // 5-7 seconds
         this.MIN_GHOST_DURATION = 2000; // Must ghost for at least 2 seconds
 
         // Track previous tile state for dirt-to-tunnel detection
@@ -930,5 +931,17 @@ export class Enemy {
             x: this.x + TILE_SIZE / 2,
             y: this.y + TILE_SIZE / 2,
         };
+    }
+
+    /**
+     * Reset all timers - called when game starts or respawns
+     */
+    resetTimers() {
+        this.ghostModeTimer = 0;
+        this.canGhostMode = false;
+        this.isGhosting = false;
+        this.ghostingDuration = 0;
+        this.stateTimer = 0;
+        this.directionChangeTimer = 0;
     }
 }

@@ -172,6 +172,18 @@ export class Game {
 
         // Reset dropped rocks counter
         this.droppedRocksCount = 0;
+
+        // Reset enemy timers (so they start when game actually begins)
+        this.resetEnemyTimers();
+    }
+
+    /**
+     * Reset all enemy timers - called when game starts/respawns
+     */
+    resetEnemyTimers() {
+        this.enemies.forEach((enemy) => {
+            enemy.resetTimers();
+        });
     }
 
     /**
@@ -420,6 +432,8 @@ export class Game {
 
         if (elapsed >= DEATH.RESPAWN_DELAY) {
             this.state = GAME_STATES.PLAYING;
+            // Reset enemy timers when gameplay resumes
+            this.resetEnemyTimers();
         }
     }
 
