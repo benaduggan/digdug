@@ -218,8 +218,11 @@ export class LevelManager {
     spawnEnemies(levelNumber) {
         const enemies = [];
 
-        // TESTING: Spawning only 1 enemy for Phase 1
-        const numEnemies = 1;
+        // Calculate number of enemies based on level
+        const numEnemies = Math.min(
+            LEVEL.START_ENEMIES + (levelNumber - 1) * LEVEL.ENEMY_INCREMENT,
+            LEVEL.MAX_ENEMIES
+        );
 
         // Calculate Pooka/Fygar ratio (more Fygars in later levels)
         const fygarRatio = Math.min(0.5, 0.2 + levelNumber * 0.05);

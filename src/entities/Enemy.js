@@ -273,10 +273,11 @@ export class Enemy {
 
     /**
      * Ghost mode movement - move directly toward player through dirt
-     * Speed reduced to 80% of base speed
+     * Uses subclass ghostSpeed if defined, otherwise 80% of base speed
      */
     moveGhost(grid, player) {
-        const ghostSpeed = this.speed * 0.8;
+        // Use subclass-specific ghostSpeed if available (Pooka/Fygar have different speeds)
+        const ghostSpeed = this.ghostSpeed || this.speed * 0.8;
 
         // Calculate direction toward player
         const dx = player.x - this.x;
