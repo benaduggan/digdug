@@ -7,16 +7,6 @@ export class Pooka extends Enemy {
         this.ghostSpeed = ENEMY.POOKA.GHOST_SPEED;
     }
 
-    /**
-     * Pookas are better at ghosting through dirt
-     */
-    move(grid, player = null) {
-        const { x: gx, y: gy } = grid.pixelToGrid(this.x, this.y);
-        const inDirt = grid.isDirt(gx, gy);
-
-        // Pookas move at same speed through dirt and tunnels (good ghosters)
-        this.isGhosting = inDirt;
-
-        super.move(grid, player);
-    }
+    // Pooka uses base Enemy movement with ghost mode from timer
+    // No override needed - ghost mode is handled by Enemy.updateGhostMode()
 }

@@ -50,6 +50,17 @@ export class Enemy {
 
         // Distance from player (for scoring)
         this.distanceFromPlayer = 0;
+
+        // Ghost mode state (Phase 4)
+        this.ghostModeTimer = 0;
+        this.canGhostMode = false;
+        this.isGhosting = false;
+        this.ghostingDuration = 0; // How long we've been ghosting
+        this.GHOST_MODE_DELAY = 6000; // 6 seconds before ghost mode available
+        this.MIN_GHOST_DURATION = 2000; // Must ghost for at least 2 seconds
+
+        // Track previous tile state for dirt-to-tunnel detection
+        this.wasInDirt = false;
     }
 
     /**
@@ -79,6 +90,9 @@ export class Enemy {
             this.updateAI(deltaTime, player, grid);
         }
 
+        // Update ghost mode timer and detect tunnel transitions (after AI so state is current)
+        this.updateGhostMode(deltaTime, player, grid);
+
         // Move enemy
         if (this.isMoving && !this.isInflating) {
             this.move(grid, player);
@@ -92,6 +106,58 @@ export class Enemy {
             const dx = this.x - player.x;
             const dy = this.y - player.y;
             this.distanceFromPlayer = Math.sqrt(dx * dx + dy * dy);
+        }
+    }
+
+    /**
+     * Update ghost mode state - timer, activation, and deactivation
+     */
+    updateGhostMode(deltaTime, player, grid) {
+        // Get current tile state
+        const { x: gx, y: gy } = grid.pixelToGrid(
+            this.x + TILE_SIZE / 2,
+            this.y + TILE_SIZE / 2
+        );
+        const currentlyInTunnel = grid.isEmpty(gx, gy);
+        const currentlyInDirt = !currentlyInTunnel && !grid.isRock(gx, gy);
+
+        // Track how long we've been ghosting
+        if (this.isGhosting) {
+            this.ghostingDuration += deltaTime;
+        }
+
+        // Detect dirt-to-tunnel transition (entering a tunnel from dirt)
+        // Only exit ghost mode if we've been ghosting for minimum duration
+        if (
+            this.wasInDirt &&
+            currentlyInTunnel &&
+            this.ghostingDuration >= this.MIN_GHOST_DURATION
+        ) {
+            // Reset ghost mode when entering tunnel
+            this.ghostModeTimer = 0;
+            this.canGhostMode = false;
+            this.isGhosting = false;
+            this.ghostingDuration = 0;
+        }
+
+        // Update previous state for next frame
+        this.wasInDirt = currentlyInDirt;
+
+        // Increment timer (always, when not currently ghosting)
+        if (!this.isGhosting) {
+            this.ghostModeTimer += deltaTime;
+
+            // After delay, ghost mode becomes available
+            if (this.ghostModeTimer >= this.GHOST_MODE_DELAY) {
+                this.canGhostMode = true;
+            }
+        }
+
+        // Ghost mode activation - when timer elapsed (regardless of AI state)
+        if (this.canGhostMode && !this.isGhosting && player) {
+            // Activate ghost mode to take direct path to player
+            this.isGhosting = true;
+            this.ghostingDuration = 0;
         }
     }
 
@@ -127,9 +193,15 @@ export class Enemy {
     }
 
     /**
-     * Move enemy through tunnels
+     * Move enemy through tunnels (or through dirt when ghosting)
      */
     move(grid, player = null) {
+        // If ghosting, use ghost movement logic
+        if (this.isGhosting && player) {
+            this.moveGhost(grid, player);
+            return;
+        }
+
         // Get current grid position
         const centerX = this.x + TILE_SIZE / 2;
         const centerY = this.y + TILE_SIZE / 2;
@@ -197,6 +269,167 @@ export class Enemy {
             this.pickValidDirection(grid, player, gx, gy);
             this.tilesTraveledInDirection = 0; // Reset counter when forced to change direction
         }
+    }
+
+    /**
+     * Ghost mode movement - move directly toward player through dirt
+     * Speed reduced to 80% of base speed
+     */
+    moveGhost(grid, player) {
+        const ghostSpeed = this.speed * 0.8;
+
+        // Calculate direction toward player
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // If very close to player, just use cardinal direction
+        if (distance < 2) {
+            return;
+        }
+
+        // Normalize direction and calculate movement
+        const normalizedDx = dx / distance;
+        const normalizedDy = dy / distance;
+
+        // Calculate desired movement
+        const moveX = normalizedDx * ghostSpeed;
+        const moveY = normalizedDy * ghostSpeed;
+
+        // Try diagonal movement first (both axes)
+        const newX = this.x + moveX;
+        const newY = this.y + moveY;
+
+        // Determine the visual direction based on primary axis
+        let newDirection;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            newDirection = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+        } else {
+            newDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+        }
+
+        // Check if we can move diagonally (check both the X and Y destinations)
+        const canMoveX = this.canGhostMoveToPosition(
+            this.x + moveX,
+            this.y,
+            grid
+        );
+        const canMoveY = this.canGhostMoveToPosition(
+            this.x,
+            this.y + moveY,
+            grid
+        );
+
+        if (canMoveX && canMoveY) {
+            // Full diagonal movement
+            this.x = newX;
+            this.y = newY;
+            this.direction = newDirection;
+            return;
+        }
+
+        // Try X movement only
+        if (canMoveX) {
+            this.x = this.x + moveX;
+            this.direction = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+            return;
+        }
+
+        // Try Y movement only
+        if (canMoveY) {
+            this.y = this.y + moveY;
+            this.direction = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+            return;
+        }
+
+        // Both blocked - try perpendicular directions to get around obstacle
+        const perpendicular1 = this.getPerpendicularDirection(
+            newDirection,
+            true
+        );
+        const perpendicular2 = this.getPerpendicularDirection(
+            newDirection,
+            false
+        );
+
+        for (const dir of [perpendicular1, perpendicular2]) {
+            const newPos = this.getNewPosition(this.x, this.y, dir, ghostSpeed);
+            if (this.canGhostMoveToPosition(newPos.x, newPos.y, grid)) {
+                this.x = newPos.x;
+                this.y = newPos.y;
+                this.direction = dir;
+                return;
+            }
+        }
+
+        // Completely stuck (surrounded by rocks) - stay in place
+    }
+
+    /**
+     * Check if ghost can move to position (only rocks block)
+     */
+    canGhostMoveToPosition(x, y, grid) {
+        // Check center point
+        const { x: gx, y: gy } = grid.pixelToGrid(
+            x + TILE_SIZE / 2,
+            y + TILE_SIZE / 2
+        );
+        return !grid.isRock(gx, gy);
+    }
+
+    /**
+     * Get perpendicular direction for rock avoidance
+     */
+    getPerpendicularDirection(dir, clockwise) {
+        if (clockwise) {
+            switch (dir) {
+                case DIRECTIONS.UP:
+                    return DIRECTIONS.RIGHT;
+                case DIRECTIONS.RIGHT:
+                    return DIRECTIONS.DOWN;
+                case DIRECTIONS.DOWN:
+                    return DIRECTIONS.LEFT;
+                case DIRECTIONS.LEFT:
+                    return DIRECTIONS.UP;
+            }
+        } else {
+            switch (dir) {
+                case DIRECTIONS.UP:
+                    return DIRECTIONS.LEFT;
+                case DIRECTIONS.LEFT:
+                    return DIRECTIONS.DOWN;
+                case DIRECTIONS.DOWN:
+                    return DIRECTIONS.RIGHT;
+                case DIRECTIONS.RIGHT:
+                    return DIRECTIONS.UP;
+            }
+        }
+        return dir;
+    }
+
+    /**
+     * Calculate new position given direction and speed
+     */
+    getNewPosition(x, y, direction, speed) {
+        let newX = x;
+        let newY = y;
+
+        switch (direction) {
+            case DIRECTIONS.UP:
+                newY -= speed;
+                break;
+            case DIRECTIONS.DOWN:
+                newY += speed;
+                break;
+            case DIRECTIONS.LEFT:
+                newX -= speed;
+                break;
+            case DIRECTIONS.RIGHT:
+                newX += speed;
+                break;
+        }
+
+        return { x: newX, y: newY };
     }
 
     /**
@@ -517,8 +750,18 @@ export class Enemy {
 
         const { x: gx, y: gy } = grid.pixelToGrid(checkX, checkY);
 
-        // Cannot move into rocks or dirt
-        if (grid.isRock(gx, gy) || !grid.isEmpty(gx, gy)) {
+        // Rocks always block movement (even when ghosting)
+        if (grid.isRock(gx, gy)) {
+            return false;
+        }
+
+        // When ghosting, can move through dirt
+        if (this.isGhosting) {
+            return true;
+        }
+
+        // Normal mode: cannot move into dirt
+        if (!grid.isEmpty(gx, gy)) {
             return false;
         }
 
