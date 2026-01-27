@@ -96,7 +96,7 @@ export const ANIMATION = {
 
 // Rock physics
 export const ROCK = {
-    FALL_DELAY: 800, // ms delay before rock falls after player triggers it
+    FALL_DELAY: 400, // 400ms delay before rock falls after player triggers it
     FALL_SPEED: 3,
     SHAKE_DURATION: 800, // ms rock shakes before falling (triggered by player from below)
 };

@@ -587,6 +587,11 @@ export class Game {
             enemy.isEscaping = false;
             enemy.hasEscaped = false;
         });
+
+        // Reset rock states (cancel any pending falls triggered by player)
+        this.rocks.forEach((rock) => {
+            rock.reset();
+        });
     }
 
     /**

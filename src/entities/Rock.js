@@ -26,6 +26,10 @@ export class Rock {
         this.playerLastX = 0;
         this.playerLastY = 0;
 
+        // Fall delay timer (starts after player clears from underneath)
+        this.fallDelayTimer = 0;
+        this.waitingToFall = false;
+
         // Grid position
         this.gridX = Math.floor(x / TILE_SIZE);
         this.gridY = Math.floor(y / TILE_SIZE);
@@ -48,25 +52,30 @@ export class Rock {
         if (this.isShaking) {
             this.shakeTimer += deltaTime;
 
-            // Check if player has moved away before allowing fall
+            // After initial shake duration, check if player has cleared
             if (this.shakeTimer > ROCK.SHAKE_DURATION) {
                 if (player && this.playerStillBelow) {
-                    // Check if player moved away
-                    const playerGridX = Math.floor(player.x / TILE_SIZE);
-                    const playerGridY = Math.floor(player.y / TILE_SIZE);
-                    const playerMoved =
-                        playerGridX !==
-                            Math.floor(this.playerLastX / TILE_SIZE) ||
-                        playerGridY !==
-                            Math.floor(this.playerLastY / TILE_SIZE);
+                    // Check if player has fully cleared from underneath the rock
+                    const playerCleared = this.hasPlayerCleared(player);
 
-                    if (playerMoved) {
+                    if (playerCleared) {
                         this.playerStillBelow = false;
-                        this.startFalling(grid);
+                        this.waitingToFall = true;
+                        this.fallDelayTimer = 0;
                     }
-                } else {
+                } else if (!this.waitingToFall) {
+                    // Player wasn't below, start falling immediately
                     this.startFalling(grid);
                 }
+            }
+        }
+
+        // Update fall delay timer (after player has cleared)
+        if (this.waitingToFall) {
+            this.fallDelayTimer += deltaTime;
+            if (this.fallDelayTimer >= this.fallDelay) {
+                this.waitingToFall = false;
+                this.startFalling(grid);
             }
         }
 
@@ -121,6 +130,27 @@ export class Rock {
     }
 
     /**
+     * Check if player has fully cleared from underneath the rock
+     */
+    hasPlayerCleared(player) {
+        // Player must be completely outside the rock's horizontal range
+        const playerLeft = player.x;
+        const playerRight = player.x + TILE_SIZE;
+        const rockLeft = this.x;
+        const rockRight = this.x + TILE_SIZE;
+
+        // Check horizontal clearance (no overlap)
+        const horizontalClear =
+            playerRight <= rockLeft || playerLeft >= rockRight;
+
+        // Also check if player moved to a different row (vertically clear)
+        const playerGridY = Math.floor(player.y / TILE_SIZE);
+        const verticalClear = playerGridY !== this.gridY + 1;
+
+        return horizontalClear || verticalClear;
+    }
+
+    /**
      * Start shaking animation
      */
     startShaking() {
@@ -157,28 +187,24 @@ export class Rock {
             const hitBottom = this.gridY >= grid.height - 1;
 
             if (hasDirtBelow || hasRockBelow || hitBottom) {
-                this.stopFalling(grid, hasDirtBelow);
+                this.stopFalling(hasDirtBelow);
             }
         }
     }
 
     /**
-     * Stop falling - crumble if hit dirt without killing enemy
+     * Stop falling - crumble after landing
      */
-    stopFalling(grid, hitDirt) {
+    stopFalling(hitDirt) {
         this.isFalling = false;
 
         // Snap to grid
         this.y = this.gridY * TILE_SIZE;
 
-        // If hit dirt and didn't crush any enemies, crumble and disappear
-        if (hitDirt && !this.crushedEnemy) {
+        // Rock always crumbles after falling (whether it crushed an enemy or hit dirt)
+        if (hitDirt || this.crushedEnemy) {
             this.isCrumbling = true;
             this.crumbleTimer = 0;
-            // Don't place rock back in grid - it will disappear
-        } else {
-            // Hit bottom or another rock, or crushed an enemy - stay in place
-            grid.placeRock(this.gridX, this.gridY);
         }
     }
 
@@ -197,5 +223,17 @@ export class Rock {
             x: this.x + TILE_SIZE / 2,
             y: this.y + TILE_SIZE / 2,
         };
+    }
+
+    /**
+     * Reset rock state (called on player respawn)
+     */
+    reset() {
+        this.isShaking = false;
+        this.shakeTimer = 0;
+        this.playerStillBelow = false;
+        this.waitingToFall = false;
+        this.fallDelayTimer = 0;
+        // Note: don't reset isFalling or position - falling rocks continue falling
     }
 }
