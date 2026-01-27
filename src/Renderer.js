@@ -47,6 +47,14 @@ export class Renderer {
             'player_digging_horizontal_2.png',
             'player_digging_vertical_1.png',
             'player_digging_vertical_2.png',
+            'pooka_walking_1.png',
+            'pooka_walking_2.png',
+            'pooka_ghosting_1.png',
+            'pooka_ghosting_2.png',
+            'fygar_walking_1.png',
+            'fygar_walking_2.png',
+            'fygar_ghosting_1.png',
+            'fygar_ghosting_2.png',
         ];
 
         let loadedCount = 0;
@@ -299,7 +307,53 @@ export class Renderer {
         this.ctx.scale(inflateScale, inflateScale);
         this.ctx.translate(-centerX, -centerY);
 
-        // Draw different colored circles for different enemy types
+        // Use sprites if loaded, otherwise fallback to red circle
+        if (this.spritesLoaded) {
+            const frameNumber = enemy.animationFrame === 0 ? '1' : '2';
+            const spriteBaseName = `${enemy.type}_${enemy.isGhosting ? 'ghosting' : 'walking'}_${frameNumber}`;
+
+            const sprite = this.sprites[spriteBaseName];
+
+            if (sprite && sprite.complete) {
+                this.ctx.save();
+
+                // Move to center
+                this.ctx.translate(centerX, centerY);
+
+                if (enemy.spriteFlipH) {
+                    this.ctx.scale(-1, 1);
+                }
+
+                // Draw sprite centered at origin
+                this.ctx.drawImage(
+                    sprite,
+                    -TILE_SIZE / 2,
+                    -TILE_SIZE / 2,
+                    TILE_SIZE,
+                    TILE_SIZE
+                );
+
+                this.ctx.restore();
+            } else {
+                this.drawEnemyFallback(enemy, centerX, centerY);
+            }
+        } else {
+            this.drawEnemyFallback(enemy, centerX, centerY);
+        }
+
+        this.ctx.restore();
+
+        // Draw fire breath for Fygar
+        if (enemy.type === 'fygar') {
+            if (enemy.isCharging && enemy.isCharging()) {
+                this.drawFygarCharging(enemy);
+            } else if (enemy.isFireActive && enemy.isFireActive()) {
+                this.drawFygarFire(enemy);
+            }
+        }
+    }
+
+    drawEnemyFallback(enemy, centerX, centerY) {
         if (enemy.type === 'pooka') {
             // Red circle for Pooka
             this.ctx.fillStyle = enemy.isGhosting
@@ -316,44 +370,6 @@ export class Renderer {
             this.ctx.beginPath();
             this.ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
             this.ctx.fill();
-        }
-
-        this.ctx.restore();
-
-        // Draw flashing eyes if in ghost mode
-        if (enemy.isGhosting) {
-            this.drawGhostModeEyes(px, py, enemy.eyeFlashTimer);
-        }
-
-        // Draw fire breath for Fygar
-        if (enemy.type === 'fygar') {
-            if (enemy.isCharging && enemy.isCharging()) {
-                this.drawFygarCharging(enemy);
-            } else if (enemy.isFireActive && enemy.isFireActive()) {
-                this.drawFygarFire(enemy);
-            }
-        }
-    }
-
-    /**
-     * Draw flashing eyes for ghost mode
-     */
-    drawGhostModeEyes(x, y, flashTimer) {
-        // Flash on/off every 200ms
-        const isVisible = Math.floor(flashTimer / 200) % 2 === 0;
-
-        if (isVisible) {
-            // Draw two white eyes
-            this.ctx.fillStyle = '#ffffff';
-            // Left eye
-            this.ctx.fillRect(x + 4, y + 6, 3, 3);
-            // Right eye
-            this.ctx.fillRect(x + 9, y + 6, 3, 3);
-
-            // Eye pupils (black)
-            this.ctx.fillStyle = '#000000';
-            this.ctx.fillRect(x + 5, y + 7, 1, 1);
-            this.ctx.fillRect(x + 10, y + 7, 1, 1);
         }
     }
 

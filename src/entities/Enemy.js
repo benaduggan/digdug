@@ -39,6 +39,7 @@ export class Enemy {
         // Animation
         this.animationFrame = 0;
         this.animationTimer = 0;
+        this.spriteFlipH = false;
 
         // Inflation (when pumped)
         this.isInflating = false;
@@ -58,7 +59,7 @@ export class Enemy {
         this.ghostingDuration = 0; // How long we've been ghosting
         // Ghost mode delay: minimum 5 seconds, plus 0-2 extra seconds in 1-second increments
         this.GHOST_MODE_DELAY = 5000 + Math.floor(Math.random() * 3) * 2500; // 5, 7.5, or 10 seconds
-        this.MIN_GHOST_DURATION = 2000; // Must ghost for at least 2 seconds
+        this.MIN_GHOST_DURATION = 1200; // Must ghost for at least 1.2 seconds
 
         // Track previous tile state for dirt-to-tunnel detection
         this.wasInDirt = false;
@@ -243,9 +244,11 @@ export class Enemy {
                 break;
             case DIRECTIONS.LEFT:
                 newX -= this.speed;
+                if (this.spriteFlipH) this.spriteFlipH = false;
                 break;
             case DIRECTIONS.RIGHT:
                 newX += this.speed;
+                if (!this.spriteFlipH) this.spriteFlipH = true;
                 break;
         }
 
@@ -900,7 +903,7 @@ export class Enemy {
 
         // Prefer horizontal movement
         if (validDirections.includes(DIRECTIONS.RIGHT)) {
-            this.direction = DIRECTIONS.RIGHT;
+            this.spriteFlipH = true;
         } else if (validDirections.includes(DIRECTIONS.LEFT)) {
             this.direction = DIRECTIONS.LEFT;
         } else if (validDirections.includes(DIRECTIONS.DOWN)) {
@@ -978,7 +981,7 @@ export class Enemy {
      */
     updateAnimation(deltaTime) {
         this.animationTimer += deltaTime;
-        if (this.animationTimer > 200) {
+        if (this.animationTimer > 400) {
             this.animationFrame = (this.animationFrame + 1) % 2;
             this.animationTimer = 0;
         }

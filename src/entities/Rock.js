@@ -18,6 +18,11 @@ export class Rock {
         this.crumbleTimer = 0;
         this.CRUMBLE_DURATION = 300; // ms to show crumble animation
 
+        // Delay before crumble when crushing enemy
+        this.waitingToCrumble = false;
+        this.crumbleDelayTimer = 0;
+        this.CRUMBLE_DELAY = 500; // 500ms delay before crumble after crushing enemy
+
         // Track if rock crushed any enemies
         this.crushedEnemy = false;
 
@@ -39,6 +44,17 @@ export class Rock {
      * Update rock state
      */
     update(deltaTime, grid, player) {
+        // Update crumble delay (after crushing enemy)
+        if (this.waitingToCrumble) {
+            this.crumbleDelayTimer += deltaTime;
+            if (this.crumbleDelayTimer >= this.CRUMBLE_DELAY) {
+                this.waitingToCrumble = false;
+                this.isCrumbling = true;
+                this.crumbleTimer = 0;
+            }
+            return; // Don't process anything else while waiting to crumble
+        }
+
         // Update crumbling animation
         if (this.isCrumbling) {
             this.crumbleTimer += deltaTime;
@@ -201,8 +217,13 @@ export class Rock {
         // Snap to grid
         this.y = this.gridY * TILE_SIZE;
 
-        // Rock always crumbles after falling (whether it crushed an enemy or hit dirt)
-        if (hitDirt || this.crushedEnemy) {
+        // Rock crumbles after falling
+        if (this.crushedEnemy) {
+            // Delay crumble by 500ms when crushing enemy
+            this.waitingToCrumble = true;
+            this.crumbleDelayTimer = 0;
+        } else if (hitDirt) {
+            // Immediate crumble when hitting dirt without crushing
             this.isCrumbling = true;
             this.crumbleTimer = 0;
         }
@@ -234,6 +255,8 @@ export class Rock {
         this.playerStillBelow = false;
         this.waitingToFall = false;
         this.fallDelayTimer = 0;
+        this.waitingToCrumble = false;
+        this.crumbleDelayTimer = 0;
         // Note: don't reset isFalling or position - falling rocks continue falling
     }
 }
