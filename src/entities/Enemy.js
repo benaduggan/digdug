@@ -1,4 +1,9 @@
-import { TILE_SIZE, DIRECTIONS } from '../utils/constants.js';
+import {
+    TILE_SIZE,
+    DIRECTIONS,
+    ENEMY,
+    ENEMY_TYPES,
+} from '../utils/constants.js';
 
 /**
  * Enemy class - Refactored for cleaner, more maintainable behavior
@@ -58,8 +63,11 @@ export class Enemy {
         this.isGhosting = false;
         this.ghostingDuration = 0; // How long we've been ghosting
         // Ghost mode delay: minimum 5 seconds, plus 0-2 extra seconds in 1-second increments
-        this.GHOST_MODE_DELAY = 5000 + Math.floor(Math.random() * 3) * 2500; // 5, 7.5, or 10 seconds
-        this.MIN_GHOST_DURATION = 1200; // Must ghost for at least 1.2 seconds
+        this.GHOST_MODE_DELAY =
+            type === ENEMY_TYPES.POOKA
+                ? ENEMY.POOKA.GHOST_MODE_DELAY
+                : ENEMY.FYGAR.GHOST_MODE_DELAY;
+        this.MIN_GHOST_DURATION = ENEMY.MIN_GHOST_DURATION;
 
         // Track previous tile state for dirt-to-tunnel detection
         this.wasInDirt = false;
@@ -128,14 +136,14 @@ export class Enemy {
             this.ghostingDuration += deltaTime;
         }
 
-        // Detect dirt-to-tunnel transition (entering a tunnel from dirt)
-        // Only exit ghost mode if we've been ghosting for minimum duration
+        // Exit ghost mode if in a tunnel and min duration elapsed
+        // This handles both dirt-to-tunnel transitions AND ghosts traveling through existing tunnels
         if (
-            this.wasInDirt &&
+            this.isGhosting &&
             currentlyInTunnel &&
             this.ghostingDuration >= this.MIN_GHOST_DURATION
         ) {
-            // Reset ghost mode when entering tunnel
+            // Reset ghost mode when in tunnel after min duration
             this.ghostModeTimer = 0;
             this.canGhostMode = false;
             this.isGhosting = false;

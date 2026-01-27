@@ -5,6 +5,7 @@ import {
     COLORS,
     DEATH,
     TILE_SIZE,
+    ENEMY_TYPES,
 } from './utils/constants.js';
 import { Renderer } from './Renderer.js';
 import { Grid } from './utils/Grid.js';
@@ -402,9 +403,6 @@ export class Game {
         this.enemies.forEach((enemy) => {
             if (enemy.isDestroyed) return;
 
-            // Skip enemies that are ghosting (in dirt) - can't pump them
-            if (enemy.isGhosting) return;
-
             // Check if pump line intersects with enemy
             const enemyCenter = enemy.getCenter();
 
@@ -492,7 +490,7 @@ export class Game {
     checkFireCollisions() {
         this.enemies.forEach((enemy) => {
             // Only Fygars can breathe fire
-            if (enemy.type !== 'fygar' || !enemy.isFireActive()) {
+            if (enemy.type === ENEMY_TYPES.POOKA || !enemy.isFireActive()) {
                 return;
             }
 

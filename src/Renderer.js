@@ -6,7 +6,7 @@ import {
     TILE_TYPES,
     DIRECTIONS,
     DEATH,
-    ENEMY,
+    ENEMY_TYPES,
 } from './utils/constants.js';
 
 export class Renderer {
@@ -55,6 +55,9 @@ export class Renderer {
             'fygar_walking_2.png',
             'fygar_ghosting_1.png',
             'fygar_ghosting_2.png',
+            'fygar_fire_1.png',
+            'fygar_fire_2.png',
+            'fygar_fire_3.png',
         ];
 
         let loadedCount = 0;
@@ -344,7 +347,7 @@ export class Renderer {
         this.ctx.restore();
 
         // Draw fire breath for Fygar
-        if (enemy.type === 'fygar') {
+        if (enemy.type === ENEMY_TYPES.FYGAR) {
             if (enemy.isCharging && enemy.isCharging()) {
                 this.drawFygarCharging(enemy);
             } else if (enemy.isFireActive && enemy.isFireActive()) {
@@ -354,7 +357,7 @@ export class Renderer {
     }
 
     drawEnemyFallback(enemy, centerX, centerY) {
-        if (enemy.type === 'pooka') {
+        if (enemy.type === ENEMY_TYPES.POOKA) {
             // Red circle for Pooka
             this.ctx.fillStyle = enemy.isGhosting
                 ? 'rgba(231, 76, 60, 0.5)'
@@ -362,7 +365,7 @@ export class Renderer {
             this.ctx.beginPath();
             this.ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
             this.ctx.fill();
-        } else if (enemy.type === 'fygar') {
+        } else if (enemy.type === ENEMY_TYPES.FYGAR) {
             // Green circle for Fygar
             this.ctx.fillStyle = enemy.isGhosting
                 ? 'rgba(46, 204, 113, 0.5)'
@@ -395,61 +398,95 @@ export class Renderer {
     }
 
     /**
-     * Draw Fygar fire breath
+     * Draw Fygar fire breath using sprites
+     * Fire extends progressively: 1 tile (fire_1) -> 2 tiles (fire_2) -> 3 tiles (fire_3)
+     * Each sprite is already the correct width (1, 2, or 3 tiles), so draw once
      */
     drawFygarFire(enemy) {
         const fireHitbox = enemy.getFireHitbox();
         if (!fireHitbox) return;
 
         const direction = enemy.getFireDirection();
-        const centerY = enemy.y + TILE_SIZE / 2;
+        const facingLeft = direction === DIRECTIONS.LEFT;
 
-        // Draw fire as a series of flame segments extending from Fygar
-        const fireLength = ENEMY.FYGAR.FIRE_RANGE;
-        const segments = 6;
-        const segmentWidth = fireLength / segments;
+        // Get current fire length (1-3 tiles based on timer)
+        const tileCount = enemy.getFireTileCount ? enemy.getFireTileCount() : 3;
 
-        for (let i = 0; i < segments; i++) {
-            // Flame color gradient from yellow to red
-            const colorProgress = i / segments;
-            const red = 255;
-            const green = Math.floor(200 - colorProgress * 150);
-            const blue = Math.floor(50 - colorProgress * 50);
-            this.ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
+        // Use the sprite that matches current fire length
+        // fire_1 = 1 tile wide, fire_2 = 2 tiles wide, fire_3 = 3 tiles wide
+        const sprite = this.sprites[`fygar_fire_${tileCount}`];
 
-            // Calculate segment position
-            let segX;
-            if (direction === DIRECTIONS.RIGHT) {
-                segX = enemy.x + TILE_SIZE + i * segmentWidth;
+        if (sprite && sprite.complete) {
+            this.ctx.save();
+
+            // Sprite width is tileCount * TILE_SIZE
+            const spriteWidth = tileCount * TILE_SIZE;
+
+            // Calculate fire position - starts at Fygar's mouth
+            let fireX;
+            if (facingLeft) {
+                // Fire extends to the left from Fygar
+                fireX = enemy.x - spriteWidth;
             } else {
-                segX = enemy.x - (i + 1) * segmentWidth;
+                // Fire extends to the right from Fygar
+                fireX = enemy.x + TILE_SIZE;
+            }
+            const fireY = enemy.y;
+
+            // Move to center of fire for flipping
+            const centerX = fireX + spriteWidth / 2;
+            const centerY = fireY + TILE_SIZE / 2;
+
+            this.ctx.translate(centerX, centerY);
+
+            // Flip horizontally if facing right (sprites are drawn facing left)
+            if (!facingLeft) {
+                this.ctx.scale(-1, 1);
             }
 
-            // Flame height varies (taller in middle, smaller at edges)
-            const baseHeight = TILE_SIZE * 0.6;
-            const heightVariation =
-                Math.sin((i / segments) * Math.PI) * TILE_SIZE * 0.3;
-            const flameHeight = baseHeight + heightVariation;
-
-            // Add flickering effect
-            const flicker = Math.sin(Date.now() / 50 + i * 2) * 2;
-
-            // Draw flame segment
-            this.ctx.fillRect(
-                segX,
-                centerY - flameHeight / 2 + flicker,
-                segmentWidth + 1, // +1 to avoid gaps
-                flameHeight
+            // Draw sprite centered - use actual sprite dimensions
+            this.ctx.drawImage(
+                sprite,
+                -spriteWidth / 2,
+                -TILE_SIZE / 2,
+                spriteWidth,
+                TILE_SIZE
             );
+
+            this.ctx.restore();
+        } else {
+            // Fallback to colored rectangles if sprite not loaded
+            for (let i = 0; i < tileCount; i++) {
+                this.drawFygarFireFallback(enemy, i, facingLeft);
+            }
+        }
+    }
+
+    /**
+     * Fallback fire rendering if sprites not loaded
+     */
+    drawFygarFireFallback(enemy, segmentIndex, facingLeft) {
+        const centerY = enemy.y + TILE_SIZE / 2;
+
+        // Color gradient from yellow to red
+        const colors = ['#ffff00', '#ff8800', '#ff3300'];
+        this.ctx.fillStyle = colors[segmentIndex];
+
+        let fireX;
+        if (facingLeft) {
+            fireX = enemy.x - (segmentIndex + 1) * TILE_SIZE;
+        } else {
+            fireX = enemy.x + TILE_SIZE + segmentIndex * TILE_SIZE;
         }
 
-        // Draw bright core of flame near Fygar
-        this.ctx.fillStyle = '#ffff00'; // Bright yellow
-        const coreX =
-            direction === DIRECTIONS.RIGHT
-                ? enemy.x + TILE_SIZE
-                : enemy.x - TILE_SIZE / 2;
-        this.ctx.fillRect(coreX, centerY - 4, TILE_SIZE / 2, 8);
+        // Draw flame rectangle
+        const flameHeight = TILE_SIZE * 0.6;
+        this.ctx.fillRect(
+            fireX + 2,
+            centerY - flameHeight / 2,
+            TILE_SIZE - 4,
+            flameHeight
+        );
     }
 
     /**

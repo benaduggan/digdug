@@ -1,9 +1,14 @@
 import { Enemy } from './Enemy.js';
-import { ENEMY, DIRECTIONS, TILE_SIZE } from '../utils/constants.js';
+import {
+    ENEMY,
+    DIRECTIONS,
+    TILE_SIZE,
+    ENEMY_TYPES,
+} from '../utils/constants.js';
 
 export class Fygar extends Enemy {
     constructor(x, y, level = 1) {
-        super(x, y, 'fygar', ENEMY.FYGAR.SPEED, level);
+        super(x, y, ENEMY_TYPES.FYGAR, ENEMY.FYGAR.SPEED, level);
         this.ghostSpeed = ENEMY.FYGAR.GHOST_SPEED;
 
         // Fire breathing state machine: 'ready' -> 'charging' -> 'firing' -> 'cooldown' -> 'ready'
@@ -30,9 +35,10 @@ export class Fygar extends Enemy {
             this.updateFireBreath(deltaTime, player, grid);
         }
 
-        // If being pumped, cancel any fire activity (charging or firing)
+        // If being pumped (or already inflated), cancel any fire activity (charging or firing)
+        // Check both isInflating and inflateLevel > 1 to catch the pump on first contact
         if (
-            this.isInflating &&
+            (this.isInflating || this.inflateLevel > 1.0) &&
             (this.fireState === 'charging' || this.fireState === 'firing')
         ) {
             this.cancelFire();
@@ -45,6 +51,21 @@ export class Fygar extends Enemy {
         ) {
             this.cancelFire();
         }
+    }
+
+    /**
+     * Override ghost mode update to pause timer while charging/firing
+     * Fygar should not accumulate ghost mode time while breathing fire
+     */
+    updateGhostMode(deltaTime, player, grid) {
+        // If currently charging or firing, don't update ghost mode at all
+        // This pauses the ghost timer while Fygar is breathing fire
+        if (this.fireState === 'charging' || this.fireState === 'firing') {
+            return;
+        }
+
+        // Otherwise use parent implementation
+        super.updateGhostMode(deltaTime, player, grid);
     }
 
     /**
@@ -90,6 +111,8 @@ export class Fygar extends Enemy {
         // Firing state - fire is active
         if (this.fireState === 'firing') {
             this.fireStateTimer += deltaTime;
+            // Recalculate hitbox each frame as fire extends
+            this.calculateFireHitbox();
             if (this.fireStateTimer >= ENEMY.FYGAR.FIRE_DURATION) {
                 this.stopFiring();
             }
@@ -136,6 +159,17 @@ export class Fygar extends Enemy {
         this.fireStateTimer = 0;
         this.fireDirection = this.direction; // Lock fire direction
         this.isMoving = false; // Stop moving while charging/firing
+
+        // Snap to grid based on center point (same as movement system uses)
+        // Use floor to avoid jumping forward
+        const gx = Math.floor((this.x + TILE_SIZE / 2) / TILE_SIZE);
+        const gy = Math.floor((this.y + TILE_SIZE / 2) / TILE_SIZE);
+        this.x = gx * TILE_SIZE;
+        this.y = gy * TILE_SIZE;
+
+        // Sync grid tracking
+        this.lastGridX = gx;
+        this.lastGridY = gy;
     }
 
     /**
@@ -148,24 +182,33 @@ export class Fygar extends Enemy {
     }
 
     /**
-     * Calculate the fire hitbox based on current position and direction
+     * Calculate the fire hitbox based on current position, direction, and tile count
+     * Hitbox grows as fire extends: 1 tile -> 2 tiles -> 3 tiles
      */
     calculateFireHitbox() {
+        // Get current fire length in tiles (1-3)
+        const tileCount = this.getFireTileCount();
+        if (tileCount === 0) {
+            this.fireHitbox = null;
+            return;
+        }
+
+        const fireWidth = tileCount * TILE_SIZE;
         const centerY = this.y + TILE_SIZE / 2;
 
         if (this.fireDirection === DIRECTIONS.RIGHT) {
             this.fireHitbox = {
                 x: this.x + TILE_SIZE, // Start from right edge of Fygar
                 y: centerY - TILE_SIZE / 4, // Vertically centered with some height
-                width: ENEMY.FYGAR.FIRE_RANGE,
+                width: fireWidth,
                 height: TILE_SIZE / 2,
             };
         } else {
             // LEFT
             this.fireHitbox = {
-                x: this.x - ENEMY.FYGAR.FIRE_RANGE, // Start from 3 tiles to the left
+                x: this.x - fireWidth, // Start from current fire length to the left
                 y: centerY - TILE_SIZE / 4,
-                width: ENEMY.FYGAR.FIRE_RANGE,
+                width: fireWidth,
                 height: TILE_SIZE / 2,
             };
         }
@@ -181,15 +224,22 @@ export class Fygar extends Enemy {
         this.fireHitbox = null;
         this.fireDirection = null;
         this.isMoving = true; // Resume movement
+
+        // Sync grid tracking to current position to prevent "new tile" detection glitch
+        const gx = Math.floor((this.x + TILE_SIZE / 2) / TILE_SIZE);
+        const gy = Math.floor((this.y + TILE_SIZE / 2) / TILE_SIZE);
+        this.lastGridX = gx;
+        this.lastGridY = gy;
     }
 
     /**
-     * Cancel fire (when pumped from behind during charge)
+     * Cancel fire (when pumped during charge/fire)
      */
     cancelFire() {
         this.fireState = 'cooldown';
         this.fireStateTimer = 0;
-        this.fireCooldownTimer = 0;
+        // Start cooldown partway through so recovery is faster after being interrupted
+        this.fireCooldownTimer = ENEMY.FYGAR.FIRE_COOLDOWN * 0.5;
         this.fireHitbox = null;
         this.fireDirection = null;
         // Don't resume movement - inflation handles that
@@ -221,6 +271,25 @@ export class Fygar extends Enemy {
      */
     getFireDirection() {
         return this.fireDirection;
+    }
+
+    /**
+     * Get current fire length in tiles (1-3) based on fire timer progress
+     * Fire extends over the duration: 1 tile -> 2 tiles -> 3 tiles
+     */
+    getFireTileCount() {
+        if (this.fireState !== 'firing') {
+            return 0;
+        }
+        // Divide fire duration into 3 phases
+        const progress = this.fireStateTimer / ENEMY.FYGAR.FIRE_DURATION;
+        if (progress < 0.33) {
+            return 1;
+        } else if (progress < 0.66) {
+            return 2;
+        } else {
+            return 3;
+        }
     }
 
     /**

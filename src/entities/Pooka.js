@@ -1,9 +1,9 @@
 import { Enemy } from './Enemy.js';
-import { ENEMY } from '../utils/constants.js';
+import { ENEMY, ENEMY_TYPES } from '../utils/constants.js';
 
 export class Pooka extends Enemy {
     constructor(x, y, level = 1) {
-        super(x, y, 'pooka', ENEMY.POOKA.SPEED, level);
+        super(x, y, ENEMY_TYPES.POOKA, ENEMY.POOKA.SPEED, level);
         this.ghostSpeed = ENEMY.POOKA.GHOST_SPEED;
     }
 

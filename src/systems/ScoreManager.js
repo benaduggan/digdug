@@ -1,4 +1,4 @@
-import { PLAYER, SCORES } from '../utils/constants.js';
+import { ENEMY_TYPES, PLAYER, SCORES } from '../utils/constants.js';
 
 export class ScoreManager {
     constructor() {
@@ -22,7 +22,9 @@ export class ScoreManager {
      */
     addEnemyKill(enemyType, distance = 0) {
         let points =
-            enemyType === 'pooka' ? SCORES.POOKA_BASE : SCORES.FYGAR_BASE;
+            enemyType === ENEMY_TYPES.POOKA
+                ? SCORES.POOKA_BASE
+                : SCORES.FYGAR_BASE;
 
         // Distance bonus (further away = more points)
         const distanceBonus =
