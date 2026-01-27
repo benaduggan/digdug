@@ -6,6 +6,7 @@ import {
     TILE_TYPES,
     DIRECTIONS,
     DEATH,
+    ENEMY,
 } from './utils/constants.js';
 
 export class Renderer {
@@ -323,6 +324,15 @@ export class Renderer {
         if (enemy.isGhosting) {
             this.drawGhostModeEyes(px, py, enemy.eyeFlashTimer);
         }
+
+        // Draw fire breath for Fygar
+        if (enemy.type === 'fygar') {
+            if (enemy.isCharging && enemy.isCharging()) {
+                this.drawFygarCharging(enemy);
+            } else if (enemy.isFireActive && enemy.isFireActive()) {
+                this.drawFygarFire(enemy);
+            }
+        }
     }
 
     /**
@@ -345,6 +355,85 @@ export class Renderer {
             this.ctx.fillRect(x + 5, y + 7, 1, 1);
             this.ctx.fillRect(x + 10, y + 7, 1, 1);
         }
+    }
+
+    /**
+     * Draw Fygar charging animation (pulsing/flashing before fire)
+     */
+    drawFygarCharging(enemy) {
+        const centerX = enemy.x + TILE_SIZE / 2;
+        const centerY = enemy.y + TILE_SIZE / 2;
+        const direction = enemy.getFireDirection();
+
+        // Flash orange/red to indicate charging
+        const flashRate = Math.floor(Date.now() / 100) % 2;
+        this.ctx.fillStyle = flashRate === 0 ? '#ff6600' : '#ff3300';
+
+        // Draw small flame particles near mouth
+        const offsetX =
+            direction === DIRECTIONS.RIGHT ? TILE_SIZE / 2 : -TILE_SIZE / 2;
+
+        this.ctx.beginPath();
+        this.ctx.arc(centerX + offsetX, centerY, 3, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    /**
+     * Draw Fygar fire breath
+     */
+    drawFygarFire(enemy) {
+        const fireHitbox = enemy.getFireHitbox();
+        if (!fireHitbox) return;
+
+        const direction = enemy.getFireDirection();
+        const centerY = enemy.y + TILE_SIZE / 2;
+
+        // Draw fire as a series of flame segments extending from Fygar
+        const fireLength = ENEMY.FYGAR.FIRE_RANGE;
+        const segments = 6;
+        const segmentWidth = fireLength / segments;
+
+        for (let i = 0; i < segments; i++) {
+            // Flame color gradient from yellow to red
+            const colorProgress = i / segments;
+            const red = 255;
+            const green = Math.floor(200 - colorProgress * 150);
+            const blue = Math.floor(50 - colorProgress * 50);
+            this.ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
+
+            // Calculate segment position
+            let segX;
+            if (direction === DIRECTIONS.RIGHT) {
+                segX = enemy.x + TILE_SIZE + i * segmentWidth;
+            } else {
+                segX = enemy.x - (i + 1) * segmentWidth;
+            }
+
+            // Flame height varies (taller in middle, smaller at edges)
+            const baseHeight = TILE_SIZE * 0.6;
+            const heightVariation =
+                Math.sin((i / segments) * Math.PI) * TILE_SIZE * 0.3;
+            const flameHeight = baseHeight + heightVariation;
+
+            // Add flickering effect
+            const flicker = Math.sin(Date.now() / 50 + i * 2) * 2;
+
+            // Draw flame segment
+            this.ctx.fillRect(
+                segX,
+                centerY - flameHeight / 2 + flicker,
+                segmentWidth + 1, // +1 to avoid gaps
+                flameHeight
+            );
+        }
+
+        // Draw bright core of flame near Fygar
+        this.ctx.fillStyle = '#ffff00'; // Bright yellow
+        const coreX =
+            direction === DIRECTIONS.RIGHT
+                ? enemy.x + TILE_SIZE
+                : enemy.x - TILE_SIZE / 2;
+        this.ctx.fillRect(coreX, centerY - 4, TILE_SIZE / 2, 8);
     }
 
     /**

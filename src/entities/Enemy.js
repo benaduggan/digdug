@@ -344,17 +344,45 @@ export class Enemy {
             return;
         }
 
-        // Both blocked - try perpendicular directions to get around obstacle
-        const perpendicular1 = this.getPerpendicularDirection(
-            newDirection,
-            true
-        );
-        const perpendicular2 = this.getPerpendicularDirection(
-            newDirection,
-            false
-        );
+        // Both blocked by rock - choose perpendicular direction that gets us closer to player
+        // Determine which perpendicular directions to try based on player position
+        let perpDirs = [];
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // Primarily blocked horizontally, try vertical movement
+            // Prefer the vertical direction toward the player
+            if (dy > 0) {
+                perpDirs = [DIRECTIONS.DOWN, DIRECTIONS.UP];
+            } else {
+                perpDirs = [DIRECTIONS.UP, DIRECTIONS.DOWN];
+            }
+        } else {
+            // Primarily blocked vertically, try horizontal movement
+            // Prefer the horizontal direction toward the player
+            if (dx > 0) {
+                perpDirs = [DIRECTIONS.RIGHT, DIRECTIONS.LEFT];
+            } else {
+                perpDirs = [DIRECTIONS.LEFT, DIRECTIONS.RIGHT];
+            }
+        }
 
-        for (const dir of [perpendicular1, perpendicular2]) {
+        for (const dir of perpDirs) {
+            const newPos = this.getNewPosition(this.x, this.y, dir, ghostSpeed);
+            if (this.canGhostMoveToPosition(newPos.x, newPos.y, grid)) {
+                this.x = newPos.x;
+                this.y = newPos.y;
+                this.direction = dir;
+                return;
+            }
+        }
+
+        // Still stuck - try all four directions as last resort
+        const allDirs = [
+            DIRECTIONS.UP,
+            DIRECTIONS.DOWN,
+            DIRECTIONS.LEFT,
+            DIRECTIONS.RIGHT,
+        ];
+        for (const dir of allDirs) {
             const newPos = this.getNewPosition(this.x, this.y, dir, ghostSpeed);
             if (this.canGhostMoveToPosition(newPos.x, newPos.y, grid)) {
                 this.x = newPos.x;

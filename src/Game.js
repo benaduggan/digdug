@@ -285,6 +285,9 @@ export class Game {
             this.checkPumpCollisions();
         }
 
+        // Fygar fire-player collisions
+        this.checkFireCollisions();
+
         // Player-enemy collisions
         this.enemies = this.enemies.filter((enemy) => {
             if (
@@ -399,6 +402,9 @@ export class Game {
         this.enemies.forEach((enemy) => {
             if (enemy.isDestroyed) return;
 
+            // Skip enemies that are ghosting (in dirt) - can't pump them
+            if (enemy.isGhosting) return;
+
             // Check if pump line intersects with enemy
             const enemyCenter = enemy.getCenter();
 
@@ -481,6 +487,37 @@ export class Game {
     }
 
     /**
+     * Check if Fygar fire hits the player
+     */
+    checkFireCollisions() {
+        this.enemies.forEach((enemy) => {
+            // Only Fygars can breathe fire
+            if (enemy.type !== 'fygar' || !enemy.isFireActive()) {
+                return;
+            }
+
+            const fireHitbox = enemy.getFireHitbox();
+            if (!fireHitbox) return;
+
+            // Check AABB collision between fire and player
+            const playerHit = this.collisionSystem.checkAABB(
+                fireHitbox.x,
+                fireHitbox.y,
+                fireHitbox.width,
+                fireHitbox.height,
+                this.player.x,
+                this.player.y,
+                TILE_SIZE,
+                TILE_SIZE
+            );
+
+            if (playerHit) {
+                this.playerHit('enemy');
+            }
+        });
+    }
+
+    /**
      * Check if bonus item should spawn
      */
     checkBonusSpawn() {
@@ -540,24 +577,15 @@ export class Game {
             enemy.x = spawnPos.x;
             enemy.y = spawnPos.y;
 
-            // Reset all timers and state
-            enemy.ghostModeTimer = 0;
-            enemy.canGhostMode = false;
-            enemy.tunnelSeekTimer = 0;
-            enemy.isGhosting = false;
+            // Reset all timers and state (includes Fygar fire state)
+            enemy.resetTimers();
+
+            // Reset additional state not covered by resetTimers
             enemy.inTunnel = true;
             enemy.state = 'roaming';
-            enemy.stateTimer = 0;
             enemy.isLastEnemy = false;
             enemy.isEscaping = false;
             enemy.hasEscaped = false;
-
-            // Reset inflation state
-            enemy.inflateTimer = 0;
-            enemy.inflateLevel = 1.0;
-            enemy.isInflating = false;
-            enemy.deflateTimer = 0;
-            enemy.isMoving = true;
         });
     }
 

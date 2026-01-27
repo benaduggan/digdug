@@ -35,7 +35,7 @@ export const DIRECTIONS = {
 export const PLAYER = {
     SPEED: 1.2, // Slightly faster than enemies (Pooka: 0.7, Fygar: 0.6)
     START_LIVES: 3,
-    PUMP_RANGE: TILE_SIZE * 2,
+    PUMP_RANGE: TILE_SIZE * 3,
 };
 
 // Enemy settings
@@ -54,8 +54,10 @@ export const ENEMY = {
         SPEED: 0.6, // Decreased for better control
         POINTS: 400,
         GHOST_SPEED: 0.4,
-        FIRE_RANGE: 48, // pixels
-        FIRE_COOLDOWN: 3000, // ms
+        FIRE_RANGE: TILE_SIZE * 3, // 3 tiles (48 pixels)
+        FIRE_COOLDOWN: 4000, // 4 seconds between fire breaths
+        FIRE_CHARGE_TIME: 500, // 500ms pause before breathing fire
+        FIRE_DURATION: 250, // 250ms fire stays visible
     },
 };
 

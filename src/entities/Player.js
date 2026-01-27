@@ -343,14 +343,35 @@ export class Player {
      * Extend pump line while Space is held
      */
     extendPump(deltaTime) {
+        // Stop extending if we've hit an enemy (pumpTarget is set)
+        if (this.pumpTarget) {
+            // If the target was destroyed (popped), immediately clear the pump
+            if (this.pumpTarget.isDestroyed) {
+                this.pumpLength = 0;
+                this.stopPump();
+            }
+            return;
+        }
+
         if (this.pumpLength < this.pumpMaxLength) {
-            this.pumpLength = Math.min(
+            // Check if extending would go into dirt
+            const nextLength = Math.min(
                 this.pumpLength + this.pumpExtendSpeed,
                 this.pumpMaxLength
             );
-            // Reset full length timer while still extending
-            this.fullLengthTimer = 0;
-        } else if (!this.pumpTarget) {
+
+            if (this.canPumpExtendTo(nextLength)) {
+                this.pumpLength = nextLength;
+                // Reset full length timer while still extending
+                this.fullLengthTimer = 0;
+            } else {
+                // Hit dirt - treat as max length reached
+                this.fullLengthTimer += deltaTime;
+                if (this.fullLengthTimer >= this.fullLengthDelay) {
+                    this.shouldAutoRetract = true;
+                }
+            }
+        } else {
             // At max length without hitting enemy - wait for delay then auto-retract
             this.fullLengthTimer += deltaTime;
             if (this.fullLengthTimer >= this.fullLengthDelay) {
@@ -360,9 +381,46 @@ export class Player {
     }
 
     /**
+     * Check if pump can extend to a given length (not blocked by dirt or rocks)
+     */
+    canPumpExtendTo(length) {
+        const centerX = this.x + TILE_SIZE / 2;
+        const centerY = this.y + TILE_SIZE / 2;
+
+        let endX = centerX;
+        let endY = centerY;
+
+        switch (this.direction) {
+            case DIRECTIONS.UP:
+                endY = centerY - length;
+                break;
+            case DIRECTIONS.DOWN:
+                endY = centerY + length;
+                break;
+            case DIRECTIONS.LEFT:
+                endX = centerX - length;
+                break;
+            case DIRECTIONS.RIGHT:
+                endX = centerX + length;
+                break;
+        }
+
+        // Check if end point is in dirt or rock
+        const { x: gx, y: gy } = this.grid.pixelToGrid(endX, endY);
+        return !this.grid.isDirt(gx, gy) && !this.grid.isRock(gx, gy);
+    }
+
+    /**
      * Retract pump line when Space is released
      */
     retractPump() {
+        // If the target was destroyed (popped), immediately clear the pump
+        if (this.pumpTarget && this.pumpTarget.isDestroyed) {
+            this.pumpLength = 0;
+            this.stopPump();
+            return;
+        }
+
         this.pumpLength = Math.max(0, this.pumpLength - this.pumpRetractSpeed);
         if (this.pumpLength === 0) {
             this.stopPump();
