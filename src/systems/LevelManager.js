@@ -264,6 +264,12 @@ export class LevelManager {
                 const x = Math.floor(Math.random() * (GRID_WIDTH - 8)) + 4;
                 const y = Math.floor(Math.random() * (GRID_HEIGHT - 8)) + 4;
 
+                // Avoid the top 3 rows (sky area + top dirt row)
+                if (y < 4) {
+                    attempts++;
+                    continue;
+                }
+
                 // Check distance from player start
                 const playerCenterX = Math.floor(GRID_WIDTH / 2);
                 const playerCenterY = Math.floor(GRID_HEIGHT / 2);
@@ -343,7 +349,7 @@ export class LevelManager {
         // Fallback: find the first empty tunnel position
         for (let y = 0; y < this.grid.height; y++) {
             for (let x = 0; x < this.grid.width; x++) {
-                if (this.grid.isEmpty(x, y)) {
+                if (this.grid.isEmpty(x, y) && y > 2) {
                     return { x: x * TILE_SIZE, y: y * TILE_SIZE };
                 }
             }

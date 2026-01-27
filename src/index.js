@@ -16,7 +16,7 @@ if (typeof window !== 'undefined') {
         const game = new Game({
             container: gameContainer,
             scale: 2,
-            debug: true,
+            debug: false,
             onGameOver: (score) => {
                 console.log('Game Over! Final Score:', score);
             },

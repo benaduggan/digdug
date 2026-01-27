@@ -16,7 +16,8 @@ export class Grid {
         for (let y = 0; y < this.height; y++) {
             this.tiles[y] = [];
             for (let x = 0; x < this.width; x++) {
-                this.tiles[y][x] = TILE_TYPES.DIRT;
+                if (y <= 1) this.tiles[y][x] = TILE_TYPES.EMPTY;
+                else this.tiles[y][x] = TILE_TYPES.DIRT;
             }
         }
     }

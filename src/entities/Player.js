@@ -233,6 +233,8 @@ export class Player {
         // Player can move through empty tiles or dirt (will dig)
         return corners.every((corner) => {
             const { x: gx, y: gy } = grid.pixelToGrid(corner.x, corner.y);
+            // Cannot move into top row (sky boundary)
+            if (gy === 0) return false;
             // Cannot move through rocks
             return !grid.isRock(gx, gy);
         });

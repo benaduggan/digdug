@@ -101,6 +101,7 @@ export class Renderer {
 
     /**
      * Draw the grid (dirt tiles and tunnels) with better visuals
+     * Top 2 rows are drawn as sky (blue)
      */
     drawGrid(grid) {
         for (let y = 0; y < grid.height; y++) {
@@ -109,9 +110,16 @@ export class Renderer {
                 const px = x * TILE_SIZE;
                 const py = y * TILE_SIZE;
 
+                // Top 2 rows are sky
+                if (y < 2) {
+                    this.ctx.fillStyle = COLORS.SKY;
+                    this.ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    continue;
+                }
+
                 if (tile === TILE_TYPES.DIRT) {
-                    // Draw dirt with depth-based coloring
-                    const depthRatio = y / grid.height;
+                    // Draw dirt with depth-based coloring (adjusted for sky rows)
+                    const depthRatio = (y - 2) / (grid.height - 2);
                     const color = this.getDirtColor(depthRatio);
                     this.ctx.fillStyle = color;
                     this.ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -143,9 +151,10 @@ export class Renderer {
      * Get dirt color based on depth
      */
     getDirtColor(depthRatio) {
-        if (depthRatio < 0.33) return COLORS.DIRT_LIGHT;
-        if (depthRatio < 0.66) return COLORS.DIRT_MID;
-        return COLORS.DIRT_DARK;
+        if (depthRatio < 0.25) return COLORS.DIRT_LIGHT;
+        if (depthRatio < 0.5) return COLORS.DIRT_MID;
+        if (depthRatio < 0.75) return COLORS.DIRT_DARK;
+        return COLORS.DIRT_DARKEST;
     }
 
     /**

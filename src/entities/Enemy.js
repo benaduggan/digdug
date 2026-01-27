@@ -407,7 +407,7 @@ export class Enemy {
     }
 
     /**
-     * Check if ghost can move to position (only rocks block)
+     * Check if ghost can move to position (only rocks and sky block)
      */
     canGhostMoveToPosition(x, y, grid) {
         // Check center point
@@ -415,6 +415,10 @@ export class Enemy {
             x + TILE_SIZE / 2,
             y + TILE_SIZE / 2
         );
+        // Top row (sky) is always blocked
+        if (gy === 0) {
+            return false;
+        }
         return !grid.isRock(gx, gy);
     }
 
@@ -790,6 +794,11 @@ export class Enemy {
         }
 
         const { x: gx, y: gy } = grid.pixelToGrid(checkX, checkY);
+
+        // Top row (sky) is always blocked
+        if (gy === 0) {
+            return false;
+        }
 
         // Rocks always block movement (even when ghosting)
         if (grid.isRock(gx, gy)) {

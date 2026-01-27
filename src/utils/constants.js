@@ -76,9 +76,11 @@ export const SCORES = {
 // Colors (arcade-accurate)
 export const COLORS = {
     BACKGROUND: '#000000',
+    SKY: '#274ac0', // Blue sky for top rows
     DIRT_LIGHT: '#8B7355',
     DIRT_MID: '#6B5344',
     DIRT_DARK: '#4B3A2F',
+    DIRT_DARKEST: '#39312a',
     PLAYER_BLUE: '#3498db',
     PLAYER_WHITE: '#ffffff',
     POOKA_RED: '#e74c3c',
