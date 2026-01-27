@@ -56,8 +56,8 @@ export class Enemy {
         this.canGhostMode = false;
         this.isGhosting = false;
         this.ghostingDuration = 0; // How long we've been ghosting
-        // Vary ghost mode delay by ~0.5s per enemy to stagger activation
-        this.GHOST_MODE_DELAY = 6000 + (Math.random() - 0.5) * 2000; // 5-7 seconds
+        // Ghost mode delay: minimum 5 seconds, plus 0-2 extra seconds in 1-second increments
+        this.GHOST_MODE_DELAY = 5000 + Math.floor(Math.random() * 3) * 2500; // 5, 7.5, or 10 seconds
         this.MIN_GHOST_DURATION = 2000; // Must ghost for at least 2 seconds
 
         // Track previous tile state for dirt-to-tunnel detection
@@ -81,8 +81,8 @@ export class Enemy {
             this.lastGridY = gy;
         }
 
-        // Update inflation if being pumped
-        if (this.isInflating) {
+        // Update inflation state (handles both inflating and deflating)
+        if (this.isInflating || this.inflateLevel > 1.0) {
             this.updateInflation(deltaTime);
         }
 
@@ -883,26 +883,59 @@ export class Enemy {
     }
 
     /**
-     * Start inflation (when pumped)
+     * Start or continue inflation (when pumped)
      */
     startInflation() {
-        if (!this.isInflating) {
-            this.isInflating = true;
-            this.inflateTimer = 0;
-            this.isMoving = false;
-        }
+        this.isInflating = true;
+        this.isMoving = false;
+        this.deflateTimer = 0; // Reset deflate countdown
+    }
+
+    /**
+     * Stop being pumped - will start deflating
+     */
+    stopInflation() {
+        // Don't immediately stop - let deflation happen in updateInflation
     }
 
     /**
      * Update inflation state
+     * Called every frame - inflates while being pumped, deflates otherwise
      */
     updateInflation(deltaTime) {
-        this.inflateTimer += deltaTime;
-        this.inflateLevel = 1.0 + this.inflateTimer / 1000;
+        const INFLATE_DURATION = 1200; // 1.2 seconds to full inflation
 
-        if (this.inflateLevel >= 2.0) {
-            this.pop();
+        if (this.isInflating) {
+            // Being actively pumped - inflate
+            this.inflateTimer += deltaTime;
+            this.inflateLevel = 1.0 + this.inflateTimer / INFLATE_DURATION;
+
+            if (this.inflateLevel >= 2.0) {
+                this.pop();
+            }
+        } else if (this.inflateLevel > 1.0) {
+            // Not being pumped - deflate slowly
+            this.deflateTimer = (this.deflateTimer || 0) + deltaTime;
+
+            // Start deflating after a short pause
+            if (this.deflateTimer > 300) {
+                this.inflateTimer = Math.max(
+                    0,
+                    this.inflateTimer - deltaTime * 0.5
+                );
+                this.inflateLevel = 1.0 + this.inflateTimer / INFLATE_DURATION;
+
+                if (this.inflateLevel <= 1.0) {
+                    // Fully deflated - can move again
+                    this.inflateLevel = 1.0;
+                    this.inflateTimer = 0;
+                    this.isMoving = true;
+                }
+            }
         }
+
+        // Reset inflating flag - must be set each frame by pump collision
+        this.isInflating = false;
     }
 
     /**
@@ -943,5 +976,11 @@ export class Enemy {
         this.ghostingDuration = 0;
         this.stateTimer = 0;
         this.directionChangeTimer = 0;
+        // Reset inflation state
+        this.inflateTimer = 0;
+        this.inflateLevel = 1.0;
+        this.isInflating = false;
+        this.deflateTimer = 0;
+        this.isMoving = true;
     }
 }

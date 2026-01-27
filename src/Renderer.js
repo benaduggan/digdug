@@ -217,9 +217,9 @@ export class Renderer {
             this.ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
 
-        // Draw pump hose if pumping
-        if (player.isPumping && player.pumpTarget) {
-            this.drawPumpHose(player, player.pumpTarget);
+        // Draw pump line if pumping
+        if (player.pumpLength > 0) {
+            this.drawPumpLine(player);
         }
     }
 
@@ -261,15 +261,26 @@ export class Renderer {
     }
 
     /**
-     * Draw pump hose connecting player to enemy
+     * Draw pump line extending from player
      */
-    drawPumpHose(player, enemy) {
+    drawPumpLine(player) {
+        const startX = player.x + TILE_SIZE / 2;
+        const startY = player.y + TILE_SIZE / 2;
+        const endPoint = player.getPumpEndPoint();
+
+        // Draw the pump line
         this.ctx.strokeStyle = COLORS.PLAYER_WHITE;
-        this.ctx.lineWidth = 2;
+        this.ctx.lineWidth = 3;
         this.ctx.beginPath();
-        this.ctx.moveTo(player.x + TILE_SIZE / 2, player.y + TILE_SIZE / 2);
-        this.ctx.lineTo(enemy.x + TILE_SIZE / 2, enemy.y + TILE_SIZE / 2);
+        this.ctx.moveTo(startX, startY);
+        this.ctx.lineTo(endPoint.x, endPoint.y);
         this.ctx.stroke();
+
+        // Draw pump head (small circle at the end)
+        this.ctx.fillStyle = COLORS.PLAYER_WHITE;
+        this.ctx.beginPath();
+        this.ctx.arc(endPoint.x, endPoint.y, 4, 0, Math.PI * 2);
+        this.ctx.fill();
     }
 
     /**

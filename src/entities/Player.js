@@ -19,7 +19,14 @@ export class Player {
         // Pump attack
         this.isPumping = false;
         this.pumpTarget = null;
-        this.pumpStartTime = 0;
+        this.pumpLength = 0; // Current length of pump line in pixels
+        this.pumpMaxLength = PLAYER.PUMP_RANGE;
+        this.pumpExtendSpeed = 4; // Pixels per frame to extend
+        this.pumpRetractSpeed = 8; // Faster retract when releasing
+        this.shouldAutoRetract = false; // Auto-retract when max length reached without hitting
+        this.pumpUsed = false; // Tracks if pump was used this Space press (requires re-press)
+        this.fullLengthTimer = 0; // Timer for delay at full length before auto-retract
+        this.fullLengthDelay = 200; // 200ms delay at full length
 
         // Animation
         this.animationFrame = 0;
@@ -40,6 +47,10 @@ export class Player {
         // Respawn invincibility
         this.isInvincible = false;
         this.invincibilityTimer = 0;
+
+        // Pump delay after start/restart
+        this.pumpCooldown = 800; // 800ms delay before can pump
+        this.pumpCooldownTimer = 0;
     }
 
     /**
@@ -70,10 +81,38 @@ export class Player {
             }
         }
 
-        // Get input direction
+        // Update pump cooldown
+        if (this.pumpCooldownTimer < this.pumpCooldown) {
+            this.pumpCooldownTimer += deltaTime;
+        }
+
+        // Handle pump attack - extend while Space held, retract when released
+        const canPump = this.pumpCooldownTimer >= this.pumpCooldown;
+        const spacePressed = inputManager.isSpacePressed();
+
+        // Reset pumpUsed flag when Space is released (allows next pump)
+        if (!spacePressed) {
+            this.pumpUsed = false;
+        }
+
+        if (
+            spacePressed &&
+            canPump &&
+            !this.shouldAutoRetract &&
+            !this.pumpUsed
+        ) {
+            if (!this.isPumping) {
+                this.startPump();
+            }
+            this.extendPump(deltaTime);
+        } else if (this.isPumping || this.pumpLength > 0) {
+            this.retractPump();
+        }
+
+        // Get input direction - but don't move or rotate while pumping
         const inputDirection = inputManager.getDirection();
 
-        if (inputDirection) {
+        if (inputDirection && !this.isPumping) {
             // Track previous direction before changing
             if (inputDirection !== this.direction) {
                 this.previousDirection = this.direction;
@@ -84,16 +123,6 @@ export class Player {
             this.move(inputDirection, grid);
         } else {
             this.isMoving = false;
-        }
-
-        // Handle pump attack
-        if (inputManager.isSpacePressed() && !this.isPumping) {
-            this.startPump();
-        }
-
-        // Update pump state
-        if (this.isPumping) {
-            this.updatePump(deltaTime);
         }
 
         // Update animation
@@ -307,16 +336,35 @@ export class Player {
      */
     startPump() {
         this.isPumping = true;
-        this.pumpStartTime = Date.now();
+        this.isMoving = false; // Can't move while pumping
     }
 
     /**
-     * Update pump state
+     * Extend pump line while Space is held
      */
-    updatePump(deltaTime) {
-        const pumpDuration = 500; // ms
+    extendPump(deltaTime) {
+        if (this.pumpLength < this.pumpMaxLength) {
+            this.pumpLength = Math.min(
+                this.pumpLength + this.pumpExtendSpeed,
+                this.pumpMaxLength
+            );
+            // Reset full length timer while still extending
+            this.fullLengthTimer = 0;
+        } else if (!this.pumpTarget) {
+            // At max length without hitting enemy - wait for delay then auto-retract
+            this.fullLengthTimer += deltaTime;
+            if (this.fullLengthTimer >= this.fullLengthDelay) {
+                this.shouldAutoRetract = true;
+            }
+        }
+    }
 
-        if (Date.now() - this.pumpStartTime > pumpDuration) {
+    /**
+     * Retract pump line when Space is released
+     */
+    retractPump() {
+        this.pumpLength = Math.max(0, this.pumpLength - this.pumpRetractSpeed);
+        if (this.pumpLength === 0) {
             this.stopPump();
         }
     }
@@ -327,6 +375,31 @@ export class Player {
     stopPump() {
         this.isPumping = false;
         this.pumpTarget = null;
+        this.pumpLength = 0;
+        this.shouldAutoRetract = false;
+        this.pumpUsed = true; // Require Space re-press for next pump
+        this.fullLengthTimer = 0;
+    }
+
+    /**
+     * Get the end point of the pump line
+     */
+    getPumpEndPoint() {
+        const centerX = this.x + TILE_SIZE / 2;
+        const centerY = this.y + TILE_SIZE / 2;
+
+        switch (this.direction) {
+            case DIRECTIONS.UP:
+                return { x: centerX, y: centerY - this.pumpLength };
+            case DIRECTIONS.DOWN:
+                return { x: centerX, y: centerY + this.pumpLength };
+            case DIRECTIONS.LEFT:
+                return { x: centerX - this.pumpLength, y: centerY };
+            case DIRECTIONS.RIGHT:
+                return { x: centerX + this.pumpLength, y: centerY };
+            default:
+                return { x: centerX, y: centerY };
+        }
     }
 
     /**
@@ -344,5 +417,20 @@ export class Player {
             x: this.x + TILE_SIZE / 2,
             y: this.y + TILE_SIZE / 2,
         };
+    }
+
+    /**
+     * Reset all timers - called when game starts or respawns
+     */
+    resetTimers() {
+        this.pumpCooldownTimer = 0;
+        this.invincibilityTimer = 0;
+        this.animationTimer = 0;
+        this.fullLengthTimer = 0;
+        this.pumpLength = 0;
+        this.isPumping = false;
+        this.pumpTarget = null;
+        this.shouldAutoRetract = false;
+        this.pumpUsed = false;
     }
 }

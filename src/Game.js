@@ -4,6 +4,7 @@ import {
     GAME_STATES,
     COLORS,
     DEATH,
+    TILE_SIZE,
 } from './utils/constants.js';
 import { Renderer } from './Renderer.js';
 import { Grid } from './utils/Grid.js';
@@ -147,7 +148,26 @@ export class Game {
         this.scoreManager.reset();
         this.lastTime = 0; // Reset time tracking
         this.startLevel(1);
+
+        // Reset all timers to start fresh
+        this.resetAllTimers();
+
         this.gameLoop(0);
+    }
+
+    /**
+     * Reset all game timers - called when game starts
+     */
+    resetAllTimers() {
+        // Reset enemy timers
+        this.enemies.forEach((enemy) => {
+            enemy.resetTimers();
+        });
+
+        // Reset player timers
+        if (this.player) {
+            this.player.resetTimers();
+        }
     }
 
     /**
@@ -172,26 +192,15 @@ export class Game {
 
         // Reset dropped rocks counter
         this.droppedRocksCount = 0;
-
-        // Reset enemy timers (so they start when game actually begins)
-        this.resetEnemyTimers();
-    }
-
-    /**
-     * Reset all enemy timers - called when game starts/respawns
-     */
-    resetEnemyTimers() {
-        this.enemies.forEach((enemy) => {
-            enemy.resetTimers();
-        });
     }
 
     /**
      * Main game loop
      */
     gameLoop(currentTime) {
-        // Calculate delta time
-        const deltaTime = currentTime - this.lastTime;
+        // Calculate delta time (cap at 100ms to prevent huge jumps on first frame or tab switch)
+        const rawDelta = currentTime - this.lastTime;
+        const deltaTime = Math.min(rawDelta, 100);
         this.lastTime = currentTime;
 
         // Update and render based on game state
@@ -271,6 +280,11 @@ export class Game {
      * Check all collisions
      */
     checkCollisions() {
+        // Pump-enemy collisions (check if pump line hits any enemy)
+        if (this.player.pumpLength > 0) {
+            this.checkPumpCollisions();
+        }
+
         // Player-enemy collisions
         this.enemies = this.enemies.filter((enemy) => {
             if (
@@ -334,6 +348,20 @@ export class Game {
         // Remove escaped enemies
         this.enemies = this.enemies.filter((enemy) => !enemy.hasEscaped);
 
+        // Remove destroyed enemies (popped from inflation)
+        this.enemies = this.enemies.filter((enemy) => {
+            if (enemy.isDestroyed) {
+                // Award points for pumped enemy
+                const points = this.scoreManager.addEnemyKill(
+                    enemy.type,
+                    enemy.distanceFromPlayer
+                );
+                this.config.onScoreChange(this.scoreManager.score);
+                return false;
+            }
+            return true;
+        });
+
         // Player-bonus item collisions
         this.bonusItems = this.bonusItems.filter((item) => {
             if (
@@ -348,6 +376,108 @@ export class Game {
             }
             return true;
         });
+    }
+
+    /**
+     * Check if pump line hits any enemies (only the closest one)
+     */
+    checkPumpCollisions() {
+        // If already inflating an enemy, only continue inflating that one
+        if (this.player.pumpTarget && !this.player.pumpTarget.isDestroyed) {
+            this.player.pumpTarget.startInflation();
+            return;
+        }
+
+        const playerCenter = this.player.getCenter();
+        const pumpEnd = this.player.getPumpEndPoint();
+        const pumpLength = this.player.pumpLength;
+
+        // Find the closest enemy that the pump line intersects
+        let closestEnemy = null;
+        let closestDistance = Infinity;
+
+        this.enemies.forEach((enemy) => {
+            if (enemy.isDestroyed) return;
+
+            // Check if pump line intersects with enemy
+            const enemyCenter = enemy.getCenter();
+
+            // Calculate distance from enemy center to pump line
+            const distToLine = this.pointToLineDistance(
+                enemyCenter.x,
+                enemyCenter.y,
+                playerCenter.x,
+                playerCenter.y,
+                pumpEnd.x,
+                pumpEnd.y
+            );
+
+            // Distance from player to enemy
+            const distToPlayer = Math.sqrt(
+                Math.pow(enemyCenter.x - playerCenter.x, 2) +
+                    Math.pow(enemyCenter.y - playerCenter.y, 2)
+            );
+
+            // Hit if close to line and within pump range
+            const hitRadius = TILE_SIZE * 0.6; // Slightly forgiving hit box
+            if (
+                distToLine < hitRadius &&
+                distToPlayer <= pumpLength + TILE_SIZE / 2
+            ) {
+                // Check enemy is in front of player (in pump direction)
+                if (
+                    this.isInPumpDirection(playerCenter, pumpEnd, enemyCenter)
+                ) {
+                    // Track the closest enemy
+                    if (distToPlayer < closestDistance) {
+                        closestDistance = distToPlayer;
+                        closestEnemy = enemy;
+                    }
+                }
+            }
+        });
+
+        // Only inflate the closest enemy (and lock onto them)
+        if (closestEnemy) {
+            closestEnemy.startInflation();
+            this.player.pumpTarget = closestEnemy;
+        }
+    }
+
+    /**
+     * Calculate perpendicular distance from point to line segment
+     */
+    pointToLineDistance(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const lengthSq = dx * dx + dy * dy;
+
+        if (lengthSq === 0) {
+            // Line is a point
+            return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+        }
+
+        // Project point onto line, clamped to segment
+        let t = ((px - x1) * dx + (py - y1) * dy) / lengthSq;
+        t = Math.max(0, Math.min(1, t));
+
+        const nearestX = x1 + t * dx;
+        const nearestY = y1 + t * dy;
+
+        return Math.sqrt((px - nearestX) ** 2 + (py - nearestY) ** 2);
+    }
+
+    /**
+     * Check if enemy is in the direction the pump is pointing
+     */
+    isInPumpDirection(playerCenter, pumpEnd, enemyCenter) {
+        const pumpDx = pumpEnd.x - playerCenter.x;
+        const pumpDy = pumpEnd.y - playerCenter.y;
+        const enemyDx = enemyCenter.x - playerCenter.x;
+        const enemyDy = enemyCenter.y - playerCenter.y;
+
+        // Dot product should be positive if enemy is in pump direction
+        return pumpDx * enemyDx + pumpDy * enemyDy > 0;
     }
 
     /**
@@ -421,6 +551,13 @@ export class Game {
             enemy.isLastEnemy = false;
             enemy.isEscaping = false;
             enemy.hasEscaped = false;
+
+            // Reset inflation state
+            enemy.inflateTimer = 0;
+            enemy.inflateLevel = 1.0;
+            enemy.isInflating = false;
+            enemy.deflateTimer = 0;
+            enemy.isMoving = true;
         });
     }
 
@@ -432,8 +569,8 @@ export class Game {
 
         if (elapsed >= DEATH.RESPAWN_DELAY) {
             this.state = GAME_STATES.PLAYING;
-            // Reset enemy timers when gameplay resumes
-            this.resetEnemyTimers();
+            // Reset all timers when gameplay resumes
+            this.resetAllTimers();
         }
     }
 

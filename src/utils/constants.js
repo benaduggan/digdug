@@ -33,10 +33,9 @@ export const DIRECTIONS = {
 
 // Player settings
 export const PLAYER = {
-    SPEED: 2,
+    SPEED: 1.2, // Slightly faster than enemies (Pooka: 0.7, Fygar: 0.6)
     START_LIVES: 3,
-    PUMP_RANGE: 64, // pixels
-    PUMP_INFLATE_TIME: 1000, // ms to fully inflate enemy
+    PUMP_RANGE: TILE_SIZE * 2,
 };
 
 // Enemy settings
