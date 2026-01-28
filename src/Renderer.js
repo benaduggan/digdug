@@ -58,6 +58,8 @@ export class Renderer {
             'fygar_fire_1.png',
             'fygar_fire_2.png',
             'fygar_fire_3.png',
+            'rock_1.png',
+            'rock_2.png',
         ];
 
         let loadedCount = 0;
@@ -117,7 +119,7 @@ export class Renderer {
                     continue;
                 }
 
-                if (tile === TILE_TYPES.DIRT) {
+                if (tile === TILE_TYPES.DIRT || tile === TILE_TYPES.ROCK) {
                     // Draw dirt with depth-based coloring (adjusted for sky rows)
                     const depthRatio = (y - 2) / (grid.height - 2);
                     const color = this.getDirtColor(depthRatio);
@@ -142,7 +144,14 @@ export class Renderer {
                         this.ctx.fillRect(px + 1, py + 1, 1, 1);
                     }
                 }
-                // Empty tiles (tunnels) are just black background
+
+                if (tile === TILE_TYPES.EMPTY) {
+                    // TODO: draw pixelations on empty tile edges
+                    // that are adjacent to dirt, round corners, and dead ends
+                    const depthRatio = (y - 2) / (grid.height - 2);
+                    const color = this.getDirtColor(depthRatio);
+                    this.ctx.fillStyle = color;
+                }
             }
         }
     }
@@ -504,6 +513,8 @@ export class Renderer {
     drawRock(rock) {
         const px = rock.x;
         const py = rock.y;
+        const centerX = px + TILE_SIZE / 2;
+        const centerY = py + TILE_SIZE / 2;
 
         this.ctx.save();
 
@@ -532,11 +543,44 @@ export class Renderer {
             this.ctx.translate(shake, 0);
         }
 
-        // Simple gray square for rock
-        this.ctx.fillStyle = '#95a5a6'; // Gray
-        this.ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        if (this.spritesLoaded) {
+            const sprite = this.sprites['rock_1'];
+
+            if (sprite && sprite.complete) {
+                this.ctx.save();
+
+                // Move to center
+                this.ctx.translate(centerX, centerY);
+
+                // Draw sprite centered at origin
+                this.ctx.drawImage(
+                    sprite,
+                    -TILE_SIZE / 2,
+                    -TILE_SIZE / 2,
+                    TILE_SIZE,
+                    TILE_SIZE
+                );
+
+                this.ctx.restore();
+            } else {
+                this.drawRockFallback(centerX, centerY);
+            }
+        } else {
+            this.drawRockFallback(centerX, centerY);
+        }
 
         this.ctx.restore();
+    }
+
+    drawRockFallback(centerX, centerY) {
+        // Simple gray square for rock
+        this.ctx.fillStyle = '#95a5a6'; // Gray
+        this.ctx.fillRect(
+            centerX + 2,
+            centerY + 2,
+            TILE_SIZE - 4,
+            TILE_SIZE - 4
+        );
     }
 
     /**

@@ -65,7 +65,7 @@ export class Enemy {
         // Ghost mode delay: minimum 5 seconds, plus 0-2 extra seconds in 1-second increments
         this.GHOST_MODE_DELAY =
             type === ENEMY_TYPES.POOKA
-                ? ENEMY.POOKA.GHOST_MODE_DELAY
+                ? ENEMY.POOKA.GHOST_MODE_DELAY()
                 : ENEMY.FYGAR.GHOST_MODE_DELAY;
         this.MIN_GHOST_DURATION = ENEMY.MIN_GHOST_DURATION;
 

@@ -50,14 +50,14 @@ export const ENEMY = {
         SPEED: 0.7, // Decreased for better control
         POINTS: 200,
         GHOST_SPEED: 0.5, // Speed when moving through dirt
-        GHOST_MODE_DELAY: 5000 + Math.floor(Math.random() * 3) * 2500, // 5, 7.5, or 10 seconds before entering ghost mode
+        GHOST_MODE_DELAY: () => 5000 + Math.floor(Math.random() * 3) * 2500, // 5, 7.5, or 10 seconds before entering ghost mode
     },
     FYGAR: {
         SPEED: 0.6, // Decreased for better control
         POINTS: 400,
         GHOST_SPEED: 0.4,
         GHOST_MODE_DELAY: 10000, // 10 seconds before entering ghost mode
-        FIRE_RANGE: TILE_SIZE * 3, // 3 tiles (48 pixels)`
+        FIRE_RANGE: TILE_SIZE * 4,
         FIRE_COOLDOWN: 2500, // 2.5 seconds between fire breaths
         FIRE_CHARGE_TIME: 300, // ms pause before breathing fire
         FIRE_DURATION: 450, // 450ms fire stays visible (150ms per tile extension)
