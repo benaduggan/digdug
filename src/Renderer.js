@@ -58,6 +58,16 @@ export class Renderer {
             'fygar_fire_1.png',
             'fygar_fire_2.png',
             'fygar_fire_3.png',
+            'pooka_inflating_1.png',
+            'pooka_inflating_2.png',
+            'pooka_inflating_3.png',
+            'pooka_popped.png',
+            'pooka_smooshed.png',
+            'fygar_inflating_1.png',
+            'fygar_inflating_2.png',
+            'fygar_inflating_3.png',
+            'fygar_popped.png',
+            'fygar_smooshed.png',
             'rock_1.png',
             'rock_2.png',
         ];
@@ -314,21 +324,38 @@ export class Renderer {
     }
 
     /**
-     * Draw an enemy (simple colored circles)
+     * Draw an enemy with inflation, popped, and smooshed states
      */
     drawEnemy(enemy) {
         const px = enemy.x;
         const py = enemy.y;
-        const inflateScale = enemy.isInflating ? enemy.inflateLevel : 1.0;
         const centerX = px + TILE_SIZE / 2;
         const centerY = py + TILE_SIZE / 2;
 
         this.ctx.save();
-        this.ctx.translate(centerX, centerY);
-        this.ctx.scale(inflateScale, inflateScale);
-        this.ctx.translate(-centerX, -centerY);
 
-        // Use sprites if loaded, otherwise fallback to red circle
+        // Handle smooshed state (crushed by rock)
+        if (enemy.isSmooshed) {
+            this.drawEnemySmooshed(enemy, centerX, centerY);
+            this.ctx.restore();
+            return;
+        }
+
+        // Handle popped state (after full inflation)
+        if (enemy.isPopped) {
+            this.drawEnemyPopped(enemy, centerX, centerY);
+            this.ctx.restore();
+            return;
+        }
+
+        // Handle inflating state (being pumped)
+        if (enemy.inflateLevel > 1.0) {
+            this.drawEnemyInflating(enemy, centerX, centerY);
+            this.ctx.restore();
+            return;
+        }
+
+        // Normal state - use walking/ghosting sprites
         if (this.spritesLoaded) {
             const frameNumber = enemy.animationFrame === 0 ? '1' : '2';
             const spriteBaseName = `${enemy.type}_${enemy.isGhosting ? 'ghosting' : 'walking'}_${frameNumber}`;
@@ -371,6 +398,108 @@ export class Renderer {
             } else if (enemy.isFireActive && enemy.isFireActive()) {
                 this.drawFygarFire(enemy);
             }
+        }
+    }
+
+    /**
+     * Draw enemy in inflating state using inflation sprites
+     * Sprites: inflating_1 (first third), inflating_2 (second third), inflating_3 (final third)
+     * Each sprite has its own size (16x16, 20x20, 21x21) - render at natural size
+     */
+    drawEnemyInflating(enemy, centerX, centerY) {
+        // inflateLevel goes from 1.0 to 2.0
+        // Map to sprite stages: 1.0-1.33 = stage 1, 1.33-1.66 = stage 2, 1.66-2.0 = stage 3
+        const inflateProgress = (enemy.inflateLevel - 1.0) / 1.0; // 0 to 1
+        let stage;
+        if (inflateProgress < 0.33) {
+            stage = 1;
+        } else if (inflateProgress < 0.66) {
+            stage = 2;
+        } else {
+            stage = 3;
+        }
+
+        const spriteName = `${enemy.type}_inflating_${stage}`;
+        const sprite = this.sprites[spriteName];
+
+        if (sprite && sprite.complete) {
+            this.ctx.save();
+            this.ctx.translate(centerX, centerY);
+
+            if (enemy.spriteFlipH) {
+                this.ctx.scale(-1, 1);
+            }
+
+            // Use sprite's natural dimensions instead of forcing TILE_SIZE
+            const spriteWidth = sprite.naturalWidth || sprite.width;
+            const spriteHeight = sprite.naturalHeight || sprite.height;
+
+            this.ctx.drawImage(
+                sprite,
+                -spriteWidth / 2,
+                -spriteHeight / 2,
+                spriteWidth,
+                spriteHeight
+            );
+
+            this.ctx.restore();
+        } else {
+            // Fallback: draw inflated circle
+            this.drawEnemyFallback(enemy, centerX, centerY);
+        }
+    }
+
+    /**
+     * Draw enemy in popped state (after full inflation)
+     */
+    drawEnemyPopped(enemy, centerX, centerY) {
+        const spriteName = `${enemy.type}_popped`;
+        const sprite = this.sprites[spriteName];
+
+        if (sprite && sprite.complete) {
+            this.ctx.save();
+            this.ctx.translate(centerX, centerY);
+
+            if (enemy.spriteFlipH) {
+                this.ctx.scale(-1, 1);
+            }
+
+            this.ctx.drawImage(
+                sprite,
+                -TILE_SIZE / 2,
+                -TILE_SIZE / 2,
+                TILE_SIZE,
+                TILE_SIZE
+            );
+
+            this.ctx.restore();
+        }
+    }
+
+    /**
+     * Draw enemy in smooshed state (crushed by rock)
+     */
+    drawEnemySmooshed(enemy, centerX, centerY) {
+        const spriteName = `${enemy.type}_smooshed`;
+        const sprite = this.sprites[spriteName];
+
+        if (sprite && sprite.complete) {
+            this.ctx.save();
+            this.ctx.translate(centerX, centerY);
+
+            if (enemy.spriteFlipH) {
+                this.ctx.scale(-1, 1);
+            }
+
+            this.ctx.drawImage(
+                sprite,
+                -TILE_SIZE / 2,
+                -TILE_SIZE / 2,
+                TILE_SIZE,
+                TILE_SIZE
+            );
+
+            this.ctx.restore();
         }
     }
 

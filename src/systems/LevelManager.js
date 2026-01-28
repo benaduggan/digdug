@@ -253,7 +253,6 @@ export class LevelManager {
      */
     createEnemyTunnels(numEnemies) {
         const minSpacing = 8; // Minimum tiles between enemy tunnels
-        const tunnelLength = Math.floor(Math.random() * 2) + 4; // 4-5 tiles long
 
         for (let i = 0; i < numEnemies; i++) {
             let placed = false;
@@ -294,7 +293,8 @@ export class LevelManager {
                 if (!tooClose) {
                     // Create tunnel (horizontal or vertical randomly)
                     const horizontal = Math.random() > 0.5;
-                    const length = Math.floor(Math.random() * 2) + 4; // 4-5 tiles
+                    // length is the offset, so length=2 means 3 tiles (x to x+2 inclusive)
+                    const length = Math.floor(Math.random() * 2) + 2; // 3-4 tiles total
 
                     if (horizontal) {
                         this.grid.clearHorizontalTunnel(
@@ -315,6 +315,69 @@ export class LevelManager {
                 }
 
                 attempts++;
+            }
+
+            // If placement failed with strict constraints, try with relaxed spacing
+            if (!placed) {
+                const relaxedSpacing = 4;
+                let relaxedAttempts = 0;
+
+                while (!placed && relaxedAttempts < 50) {
+                    const x = Math.floor(Math.random() * (GRID_WIDTH - 8)) + 4;
+                    const y = Math.floor(Math.random() * (GRID_HEIGHT - 8)) + 4;
+
+                    if (y < 4) {
+                        relaxedAttempts++;
+                        continue;
+                    }
+
+                    // Only check distance from player (skip tunnel spacing check)
+                    const playerCenterX = Math.floor(GRID_WIDTH / 2);
+                    const playerCenterY = Math.floor(GRID_HEIGHT / 2);
+                    const distFromPlayer = Math.sqrt(
+                        Math.pow(x - playerCenterX, 2) +
+                            Math.pow(y - playerCenterY, 2)
+                    );
+
+                    // Relaxed player distance
+                    if (distFromPlayer < 6) {
+                        relaxedAttempts++;
+                        continue;
+                    }
+
+                    // Check with relaxed spacing
+                    const tooClose = this.enemyTunnels.some((tunnel) => {
+                        const dist = Math.sqrt(
+                            Math.pow(tunnel.x - x, 2) +
+                                Math.pow(tunnel.y - y, 2)
+                        );
+                        return dist < relaxedSpacing;
+                    });
+
+                    if (!tooClose) {
+                        const horizontal = Math.random() > 0.5;
+                        const length = Math.floor(Math.random() * 2) + 2;
+
+                        if (horizontal) {
+                            this.grid.clearHorizontalTunnel(
+                                x,
+                                Math.min(x + length, GRID_WIDTH - 2),
+                                y
+                            );
+                        } else {
+                            this.grid.clearVerticalTunnel(
+                                x,
+                                y,
+                                Math.min(y + length, GRID_HEIGHT - 2)
+                            );
+                        }
+
+                        this.enemyTunnels.push({ x, y, horizontal, length });
+                        placed = true;
+                    }
+
+                    relaxedAttempts++;
+                }
             }
         }
     }

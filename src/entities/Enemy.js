@@ -54,6 +54,17 @@ export class Enemy {
         this.isInflating = false;
         this.inflateLevel = 1.0;
         this.inflateTimer = 0;
+        this.INFLATE_DURATION = 1200; // 1.2 seconds to full inflation
+
+        // Popped state (after full inflation)
+        this.isPopped = false;
+        this.poppedTimer = 0;
+        this.POPPED_DURATION = 400; // Show popped sprite for 1/3 of inflate time
+
+        // Smooshed state (crushed by rock)
+        this.isSmooshed = false;
+        this.smooshedTimer = 0;
+        this.SMOOSHED_DURATION = 400;
 
         // Destruction flag
         this.isDestroyed = false;
@@ -81,6 +92,18 @@ export class Enemy {
      * Update enemy state
      */
     update(deltaTime, player, grid) {
+        // Update popped state (dying from inflation)
+        if (this.isPopped) {
+            this.updatePoppedState(deltaTime);
+            return; // Don't update anything else while popped
+        }
+
+        // Update smooshed state (crushed by rock)
+        if (this.isSmooshed) {
+            this.updateSmooshedState(deltaTime);
+            return; // Don't update anything else while smooshed
+        }
+
         // Initialize direction on first update if needed
         if (!this.directionInitialized) {
             this.initializeDirection(grid);
@@ -414,11 +437,11 @@ export class Enemy {
     }
 
     /**
-     * Check if ghost can move to position (only rocks and sky block)
+     * Check if ghost can move to position (only sky blocks)
      */
     canGhostMoveToPosition(x, y, grid) {
         // Check center point
-        const { x: gx, y: gy } = grid.pixelToGrid(
+        const { y: gy } = grid.pixelToGrid(
             x + TILE_SIZE / 2,
             y + TILE_SIZE / 2
         );
@@ -426,7 +449,8 @@ export class Enemy {
         if (gy === 0) {
             return false;
         }
-        return !grid.isRock(gx, gy);
+        // Ghosts can pass through rocks and dirt
+        return true;
     }
 
     /**
@@ -869,7 +893,12 @@ export class Enemy {
             return false;
         }
 
-        // Rocks always block movement (even when ghosting)
+        // When ghosting, can move through rocks
+        if (this.isGhosting) {
+            return true;
+        }
+
+        // Rocks block normal movement
         if (grid.isRock(gx, gy)) {
             return false;
         }
@@ -1030,12 +1059,10 @@ export class Enemy {
      * Called every frame - inflates while being pumped, deflates otherwise
      */
     updateInflation(deltaTime) {
-        const INFLATE_DURATION = 1200; // 1.2 seconds to full inflation
-
         if (this.isInflating) {
             // Being actively pumped - inflate
             this.inflateTimer += deltaTime;
-            this.inflateLevel = 1.0 + this.inflateTimer / INFLATE_DURATION;
+            this.inflateLevel = 1.0 + this.inflateTimer / this.INFLATE_DURATION;
 
             if (this.inflateLevel >= 2.0) {
                 this.pop();
@@ -1050,7 +1077,8 @@ export class Enemy {
                     0,
                     this.inflateTimer - deltaTime * 0.5
                 );
-                this.inflateLevel = 1.0 + this.inflateTimer / INFLATE_DURATION;
+                this.inflateLevel =
+                    1.0 + this.inflateTimer / this.INFLATE_DURATION;
 
                 if (this.inflateLevel <= 1.0) {
                     // Fully deflated - can move again
@@ -1066,10 +1094,54 @@ export class Enemy {
     }
 
     /**
-     * Enemy pops (dies)
+     * Enemy pops (dies from inflation)
+     * Shows popped sprite before being destroyed
      */
     pop() {
-        this.isDestroyed = true;
+        this.isPopped = true;
+        this.poppedTimer = 0;
+        this.isMoving = false;
+    }
+
+    /**
+     * Enemy gets smooshed (crushed by rock)
+     * Shows smooshed sprite and falls with rock
+     */
+    smoosh() {
+        this.isSmooshed = true;
+        this.smooshedTimer = 0;
+        this.isMoving = false;
+    }
+
+    /**
+     * Update popped state timer
+     */
+    updatePoppedState(deltaTime) {
+        if (!this.isPopped) return;
+
+        this.poppedTimer += deltaTime;
+        if (this.poppedTimer >= this.POPPED_DURATION) {
+            this.isDestroyed = true;
+        }
+    }
+
+    /**
+     * Update smooshed state timer
+     * Only counts down after the rock has stopped falling
+     */
+    updateSmooshedState(deltaTime) {
+        if (!this.isSmooshed) return;
+
+        // Only start the destruction timer after the rock has stopped falling
+        // This ensures the enemy stays visible while falling with the rock
+        if (this.attachedToRock && this.attachedToRock.isFalling) {
+            return; // Don't count timer while rock is still falling
+        }
+
+        this.smooshedTimer += deltaTime;
+        if (this.smooshedTimer >= this.SMOOSHED_DURATION) {
+            this.isDestroyed = true;
+        }
     }
 
     /**

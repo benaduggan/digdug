@@ -317,7 +317,10 @@ export class Game {
         this.rocks.forEach((rock) => {
             if (rock.isFalling) {
                 // Check rock-enemy
-                this.enemies = this.enemies.filter((enemy) => {
+                this.enemies.forEach((enemy) => {
+                    // Skip already smooshed enemies
+                    if (enemy.isSmooshed) return;
+
                     if (
                         this.collisionSystem.checkRockEntityCollision(
                             rock,
@@ -329,9 +332,14 @@ export class Game {
                         this.config.onScoreChange(this.scoreManager.score);
                         this.droppedRocksCount++;
                         this.checkBonusSpawn();
-                        return false;
+
+                        // Smoosh the enemy and attach to rock
+                        enemy.smoosh();
+                        enemy.attachedToRock = rock;
+                        // Immediately sync position so enemy doesn't lag behind
+                        enemy.x = rock.x;
+                        enemy.y = rock.y;
                     }
-                    return true;
                 });
 
                 // Check rock-player
@@ -344,6 +352,14 @@ export class Game {
                     this.playerHit('rock');
                 }
             }
+
+            // Update smooshed enemies attached to this rock - they fall with it
+            this.enemies.forEach((enemy) => {
+                if (enemy.isSmooshed && enemy.attachedToRock === rock) {
+                    enemy.x = rock.x;
+                    enemy.y = rock.y;
+                }
+            });
         });
 
         // Remove destroyed/crumbled rocks
@@ -352,15 +368,17 @@ export class Game {
         // Remove escaped enemies
         this.enemies = this.enemies.filter((enemy) => !enemy.hasEscaped);
 
-        // Remove destroyed enemies (popped from inflation)
+        // Remove destroyed enemies (popped from inflation or smooshed by rock)
         this.enemies = this.enemies.filter((enemy) => {
             if (enemy.isDestroyed) {
-                // Award points for pumped enemy
-                const points = this.scoreManager.addEnemyKill(
-                    enemy.type,
-                    enemy.distanceFromPlayer
-                );
-                this.config.onScoreChange(this.scoreManager.score);
+                // Only award points for pumped enemies (not smooshed - those were scored when rock hit)
+                if (!enemy.isSmooshed) {
+                    this.scoreManager.addEnemyKill(
+                        enemy.type,
+                        enemy.distanceFromPlayer
+                    );
+                    this.config.onScoreChange(this.scoreManager.score);
+                }
                 return false;
             }
             return true;
