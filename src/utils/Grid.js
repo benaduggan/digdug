@@ -5,6 +5,7 @@ export class Grid {
         this.width = GRID_WIDTH;
         this.height = GRID_HEIGHT;
         this.tiles = [];
+        this.stateVersion = 0; // Increments when grid changes
         this.init();
     }
 
@@ -20,6 +21,7 @@ export class Grid {
                 else this.tiles[y][x] = TILE_TYPES.DIRT;
             }
         }
+        this.stateVersion++; // Mark as changed
     }
 
     /**
@@ -37,8 +39,19 @@ export class Grid {
      */
     setTile(x, y, type) {
         if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
-            this.tiles[y][x] = type;
+            if (this.tiles[y][x] !== type) {
+                this.tiles[y][x] = type;
+                this.stateVersion++; // Mark grid as changed
+            }
         }
+    }
+
+    /**
+     * Get a simple version number that changes when grid changes
+     * Used by renderer for cache invalidation
+     */
+    getStateHash() {
+        return this.stateVersion;
     }
 
     /**

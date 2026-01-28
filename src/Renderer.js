@@ -32,6 +32,15 @@ export class Renderer {
         this.sprites = {};
         this.spritesLoaded = false;
         this.loadSprites();
+
+        // Background cache - pre-rendered dirt layer for performance
+        this.backgroundCanvas = document.createElement('canvas');
+        this.backgroundCanvas.width = config.width;
+        this.backgroundCanvas.height = config.height;
+        this.backgroundCtx = this.backgroundCanvas.getContext('2d');
+        this.backgroundCtx.imageSmoothingEnabled = false;
+        this.backgroundDirty = true; // Flag to rebuild background when grid changes
+        this.lastGridState = null; // Track grid state to detect changes
     }
 
     /**
@@ -105,17 +114,62 @@ export class Renderer {
 
     /**
      * Clear the canvas
+     * Note: With background caching, we don't need to clear to black
+     * since drawGrid() will overwrite with the cached background
      */
     clear() {
-        this.ctx.fillStyle = COLORS.BACKGROUND;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        // Only clear if background isn't ready yet
+        if (this.backgroundDirty || !this.lastGridState) {
+            this.ctx.fillStyle = COLORS.BACKGROUND;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
     }
 
     /**
-     * Draw the grid (dirt tiles and tunnels) with better visuals
-     * Top 2 rows are drawn as sky (blue)
+     * Mark the background as needing redraw (call when grid changes)
+     */
+    markBackgroundDirty() {
+        this.backgroundDirty = true;
+    }
+
+    /**
+     * Draw the grid using cached background for performance
+     * Only redraws when grid actually changes
      */
     drawGrid(grid) {
+        // Check if grid state changed (simple hash of tunnel positions)
+        const currentGridState = grid.getStateHash ? grid.getStateHash() : null;
+        if (currentGridState !== this.lastGridState) {
+            this.backgroundDirty = true;
+            this.lastGridState = currentGridState;
+        }
+
+        // Rebuild background cache if dirty
+        if (this.backgroundDirty) {
+            this.renderBackgroundToCache(grid);
+            this.backgroundDirty = false;
+        }
+
+        // Draw cached background in one operation
+        this.ctx.drawImage(this.backgroundCanvas, 0, 0);
+    }
+
+    /**
+     * Render the full background to the cache canvas
+     * Called only when grid changes
+     */
+    renderBackgroundToCache(grid) {
+        const ctx = this.backgroundCtx;
+
+        // Clear with background color
+        ctx.fillStyle = COLORS.BACKGROUND;
+        ctx.fillRect(
+            0,
+            0,
+            this.backgroundCanvas.width,
+            this.backgroundCanvas.height
+        );
+
         for (let y = 0; y < grid.height; y++) {
             for (let x = 0; x < grid.width; x++) {
                 const tile = grid.getTile(x, y);
@@ -124,8 +178,8 @@ export class Renderer {
 
                 // Top 2 rows are sky
                 if (y < 2) {
-                    this.ctx.fillStyle = COLORS.SKY;
-                    this.ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = COLORS.SKY;
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
                     continue;
                 }
 
@@ -133,35 +187,26 @@ export class Renderer {
                     // Draw dirt with depth-based coloring (adjusted for sky rows)
                     const depthRatio = (y - 2) / (grid.height - 2);
                     const color = this.getDirtColor(depthRatio);
-                    this.ctx.fillStyle = color;
-                    this.ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
-                    // Add deterministic texture pattern using position-based seed
-                    const seed = x * 1000 + y;
-                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-                    // Create a simple dirt texture pattern
+                    // Add deterministic texture pattern
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
                     if ((x + y) % 2 === 0) {
-                        this.ctx.fillRect(px + 2, py + 2, 2, 2);
-                        this.ctx.fillRect(px + 8, py + 10, 2, 2);
+                        ctx.fillRect(px + 2, py + 2, 2, 2);
+                        ctx.fillRect(px + 8, py + 10, 2, 2);
                     } else {
-                        this.ctx.fillRect(px + 6, py + 4, 2, 2);
-                        this.ctx.fillRect(px + 12, py + 8, 2, 2);
+                        ctx.fillRect(px + 6, py + 4, 2, 2);
+                        ctx.fillRect(px + 12, py + 8, 2, 2);
                     }
 
                     // Add lighter highlights
-                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
                     if ((x + y) % 3 === 0) {
-                        this.ctx.fillRect(px + 1, py + 1, 1, 1);
+                        ctx.fillRect(px + 1, py + 1, 1, 1);
                     }
                 }
-
-                if (tile === TILE_TYPES.EMPTY) {
-                    // TODO: draw pixelations on empty tile edges
-                    // that are adjacent to dirt, round corners, and dead ends
-                    const depthRatio = (y - 2) / (grid.height - 2);
-                    const color = this.getDirtColor(depthRatio);
-                    this.ctx.fillStyle = color;
-                }
+                // Empty tiles are just the background color (already cleared)
             }
         }
     }
@@ -199,53 +244,44 @@ export class Renderer {
         // Use sprites if loaded, otherwise fallback to simple square
         if (this.spritesLoaded) {
             // Determine which sprite set to use (horizontal or vertical, walking or digging)
-            let spriteBaseName = '';
             const spriteAction = player.isDigging ? 'digging' : 'walking';
             const frameNumber = player.animationFrame === 0 ? '1' : '2';
-
-            // Select sprite based on direction
-            if (
+            const orientation =
                 player.direction === DIRECTIONS.LEFT ||
                 player.direction === DIRECTIONS.RIGHT
-            ) {
-                // Use horizontal sprites
-                spriteBaseName = `player_${spriteAction}_horizontal_${frameNumber}`;
-            } else {
-                // Use vertical sprites for UP and DOWN
-                spriteBaseName = `player_${spriteAction}_vertical_${frameNumber}`;
-            }
+                    ? 'horizontal'
+                    : 'vertical';
 
-            const sprite = this.sprites[spriteBaseName];
+            const sprite =
+                this.sprites[
+                    `player_${spriteAction}_${orientation}_${frameNumber}`
+                ];
 
             if (sprite && sprite.complete) {
-                this.ctx.save();
+                // Only use save/restore if we need to flip
+                const needsFlip = player.spriteFlipH || player.spriteFlipV;
 
-                // Calculate center point for transformations
-                const centerX = px + TILE_SIZE / 2;
-                const centerY = py + TILE_SIZE / 2;
-
-                // Move to center
-                this.ctx.translate(centerX, centerY);
-
-                // Apply flips based on player's sprite state
-                if (player.spriteFlipH && player.spriteFlipV) {
-                    this.ctx.scale(-1, -1);
-                } else if (player.spriteFlipH) {
-                    this.ctx.scale(-1, 1);
-                } else if (player.spriteFlipV) {
-                    this.ctx.scale(1, -1);
+                if (needsFlip) {
+                    this.ctx.save();
+                    const centerX = px + TILE_SIZE / 2;
+                    const centerY = py + TILE_SIZE / 2;
+                    this.ctx.translate(centerX, centerY);
+                    this.ctx.scale(
+                        player.spriteFlipH ? -1 : 1,
+                        player.spriteFlipV ? -1 : 1
+                    );
+                    this.ctx.drawImage(
+                        sprite,
+                        -TILE_SIZE / 2,
+                        -TILE_SIZE / 2,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    );
+                    this.ctx.restore();
+                } else {
+                    // No flip needed - draw directly without save/restore
+                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
                 }
-
-                // Draw sprite centered at origin
-                this.ctx.drawImage(
-                    sprite,
-                    -TILE_SIZE / 2,
-                    -TILE_SIZE / 2,
-                    TILE_SIZE,
-                    TILE_SIZE
-                );
-
-                this.ctx.restore();
             } else {
                 // Fallback to simple blue square
                 this.ctx.fillStyle = '#3498db';
@@ -332,64 +368,55 @@ export class Renderer {
         const centerX = px + TILE_SIZE / 2;
         const centerY = py + TILE_SIZE / 2;
 
-        this.ctx.save();
-
         // Handle smooshed state (crushed by rock)
         if (enemy.isSmooshed) {
-            this.drawEnemySmooshed(enemy, centerX, centerY);
-            this.ctx.restore();
+            this.drawEnemySmooshed(enemy, px, py, centerX, centerY);
             return;
         }
 
         // Handle popped state (after full inflation)
         if (enemy.isPopped) {
-            this.drawEnemyPopped(enemy, centerX, centerY);
-            this.ctx.restore();
+            this.drawEnemyPopped(enemy, px, py, centerX, centerY);
             return;
         }
 
         // Handle inflating state (being pumped)
         if (enemy.inflateLevel > 1.0) {
             this.drawEnemyInflating(enemy, centerX, centerY);
-            this.ctx.restore();
             return;
         }
 
         // Normal state - use walking/ghosting sprites
         if (this.spritesLoaded) {
             const frameNumber = enemy.animationFrame === 0 ? '1' : '2';
-            const spriteBaseName = `${enemy.type}_${enemy.isGhosting ? 'ghosting' : 'walking'}_${frameNumber}`;
-
-            const sprite = this.sprites[spriteBaseName];
+            const state = enemy.isGhosting ? 'ghosting' : 'walking';
+            const sprite =
+                this.sprites[`${enemy.type}_${state}_${frameNumber}`];
 
             if (sprite && sprite.complete) {
-                this.ctx.save();
-
-                // Move to center
-                this.ctx.translate(centerX, centerY);
-
                 if (enemy.spriteFlipH) {
+                    // Only use save/restore when flipping
+                    this.ctx.save();
+                    this.ctx.translate(centerX, centerY);
                     this.ctx.scale(-1, 1);
+                    this.ctx.drawImage(
+                        sprite,
+                        -TILE_SIZE / 2,
+                        -TILE_SIZE / 2,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    );
+                    this.ctx.restore();
+                } else {
+                    // No flip - draw directly
+                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
                 }
-
-                // Draw sprite centered at origin
-                this.ctx.drawImage(
-                    sprite,
-                    -TILE_SIZE / 2,
-                    -TILE_SIZE / 2,
-                    TILE_SIZE,
-                    TILE_SIZE
-                );
-
-                this.ctx.restore();
             } else {
                 this.drawEnemyFallback(enemy, centerX, centerY);
             }
         } else {
             this.drawEnemyFallback(enemy, centerX, centerY);
         }
-
-        this.ctx.restore();
 
         // Draw fire breath for Fygar
         if (enemy.type === ENEMY_TYPES.FYGAR) {
@@ -452,54 +479,50 @@ export class Renderer {
     /**
      * Draw enemy in popped state (after full inflation)
      */
-    drawEnemyPopped(enemy, centerX, centerY) {
-        const spriteName = `${enemy.type}_popped`;
-        const sprite = this.sprites[spriteName];
+    drawEnemyPopped(enemy, px, py, centerX, centerY) {
+        const sprite = this.sprites[`${enemy.type}_popped`];
 
         if (sprite && sprite.complete) {
-            this.ctx.save();
-            this.ctx.translate(centerX, centerY);
-
             if (enemy.spriteFlipH) {
+                this.ctx.save();
+                this.ctx.translate(centerX, centerY);
                 this.ctx.scale(-1, 1);
+                this.ctx.drawImage(
+                    sprite,
+                    -TILE_SIZE / 2,
+                    -TILE_SIZE / 2,
+                    TILE_SIZE,
+                    TILE_SIZE
+                );
+                this.ctx.restore();
+            } else {
+                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
             }
-
-            this.ctx.drawImage(
-                sprite,
-                -TILE_SIZE / 2,
-                -TILE_SIZE / 2,
-                TILE_SIZE,
-                TILE_SIZE
-            );
-
-            this.ctx.restore();
         }
     }
 
     /**
      * Draw enemy in smooshed state (crushed by rock)
      */
-    drawEnemySmooshed(enemy, centerX, centerY) {
-        const spriteName = `${enemy.type}_smooshed`;
-        const sprite = this.sprites[spriteName];
+    drawEnemySmooshed(enemy, px, py, centerX, centerY) {
+        const sprite = this.sprites[`${enemy.type}_smooshed`];
 
         if (sprite && sprite.complete) {
-            this.ctx.save();
-            this.ctx.translate(centerX, centerY);
-
             if (enemy.spriteFlipH) {
+                this.ctx.save();
+                this.ctx.translate(centerX, centerY);
                 this.ctx.scale(-1, 1);
+                this.ctx.drawImage(
+                    sprite,
+                    -TILE_SIZE / 2,
+                    -TILE_SIZE / 2,
+                    TILE_SIZE,
+                    TILE_SIZE
+                );
+                this.ctx.restore();
+            } else {
+                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
             }
-
-            this.ctx.drawImage(
-                sprite,
-                -TILE_SIZE / 2,
-                -TILE_SIZE / 2,
-                TILE_SIZE,
-                TILE_SIZE
-            );
-
-            this.ctx.restore();
         }
     }
 
@@ -642,74 +665,43 @@ export class Renderer {
     drawRock(rock) {
         const px = rock.x;
         const py = rock.y;
-        const centerX = px + TILE_SIZE / 2;
-        const centerY = py + TILE_SIZE / 2;
 
-        this.ctx.save();
-
-        // Crumble animation
+        // Crumble animation - needs alpha so use save/restore
         if (rock.isCrumbling) {
             const progress = rock.crumbleTimer / rock.CRUMBLE_DURATION;
-            const alpha = 1 - progress; // Fade out
-
-            this.ctx.globalAlpha = alpha;
-
-            // Draw crumbling particles
-            this.ctx.fillStyle = '#95a5a6'; // Gray
+            this.ctx.save();
+            this.ctx.globalAlpha = 1 - progress;
+            this.ctx.fillStyle = '#95a5a6';
             const offset = progress * 4;
-            // Main pieces breaking apart
             this.ctx.fillRect(px + 2 - offset, py + 3, 4, 4);
             this.ctx.fillRect(px + 10 + offset, py + 3, 4, 4);
             this.ctx.fillRect(px + 6, py + 8 + offset, 4, 4);
-
             this.ctx.restore();
             return;
         }
 
-        // Shake effect if about to fall
-        if (rock.isShaking) {
-            const shake = Math.sin(Date.now() / 50) * 2;
-            this.ctx.translate(shake, 0);
-        }
+        // Calculate shake offset (use rock's own timer instead of Date.now for consistency)
+        const shakeOffset = rock.isShaking
+            ? Math.sin(rock.shakeTimer / 50) * 2
+            : 0;
+        const drawX = px + shakeOffset;
 
         if (this.spritesLoaded) {
             const sprite = this.sprites['rock_1'];
-
             if (sprite && sprite.complete) {
-                this.ctx.save();
-
-                // Move to center
-                this.ctx.translate(centerX, centerY);
-
-                // Draw sprite centered at origin
-                this.ctx.drawImage(
-                    sprite,
-                    -TILE_SIZE / 2,
-                    -TILE_SIZE / 2,
-                    TILE_SIZE,
-                    TILE_SIZE
-                );
-
-                this.ctx.restore();
+                this.ctx.drawImage(sprite, drawX, py, TILE_SIZE, TILE_SIZE);
             } else {
-                this.drawRockFallback(centerX, centerY);
+                this.drawRockFallback(drawX, py);
             }
         } else {
-            this.drawRockFallback(centerX, centerY);
+            this.drawRockFallback(drawX, py);
         }
-
-        this.ctx.restore();
     }
 
-    drawRockFallback(centerX, centerY) {
+    drawRockFallback(px, py) {
         // Simple gray square for rock
-        this.ctx.fillStyle = '#95a5a6'; // Gray
-        this.ctx.fillRect(
-            centerX + 2,
-            centerY + 2,
-            TILE_SIZE - 4,
-            TILE_SIZE - 4
-        );
+        this.ctx.fillStyle = '#95a5a6';
+        this.ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
     }
 
     /**
