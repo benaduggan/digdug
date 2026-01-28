@@ -751,7 +751,7 @@ export class Game {
      * Render game over
      */
     renderGameOver() {
-        this.renderer.clear();
+        this.renderer.forceClear();
         this.renderer.drawText(
             'GAME OVER',
             CANVAS_WIDTH / 2,

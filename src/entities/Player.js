@@ -21,7 +21,7 @@ export class Player {
         this.pumpTarget = null;
         this.pumpLength = 0; // Current length of pump line in pixels
         this.pumpMaxLength = PLAYER.PUMP_RANGE;
-        this.pumpExtendSpeed = 4; // Pixels per frame to extend
+        this.pumpExtendSpeed = 5; // Pixels per frame to extend
         this.pumpRetractSpeed = 8; // Faster retract when releasing
         this.shouldAutoRetract = false; // Auto-retract when max length reached without hitting
         this.pumpUsed = false; // Tracks if pump was used this Space press (requires re-press)

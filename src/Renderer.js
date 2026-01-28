@@ -126,6 +126,14 @@ export class Renderer {
     }
 
     /**
+     * Force clear the canvas to black (for menus, game over screens, etc.)
+     */
+    forceClear() {
+        this.ctx.fillStyle = COLORS.BACKGROUND;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    /**
      * Mark the background as needing redraw (call when grid changes)
      */
     markBackgroundDirty() {
