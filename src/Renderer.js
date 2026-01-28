@@ -378,7 +378,7 @@ export class Renderer {
 
         // Handle smooshed state (crushed by rock)
         if (enemy.isSmooshed) {
-            this.drawEnemySmooshed(enemy, px, py, centerX, centerY);
+            this.drawEnemySmooshed(enemy, centerX, centerY);
             return;
         }
 
@@ -401,25 +401,7 @@ export class Renderer {
             const sprite =
                 this.sprites[`${enemy.type}_${state}_${frameNumber}`];
 
-            if (sprite && sprite.complete) {
-                if (enemy.spriteFlipH) {
-                    // Only use save/restore when flipping
-                    this.ctx.save();
-                    this.ctx.translate(centerX, centerY);
-                    this.ctx.scale(-1, 1);
-                    this.ctx.drawImage(
-                        sprite,
-                        -TILE_SIZE / 2,
-                        -TILE_SIZE / 2,
-                        TILE_SIZE,
-                        TILE_SIZE
-                    );
-                    this.ctx.restore();
-                } else {
-                    // No flip - draw directly
-                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-                }
-            }
+            this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
         }
 
         // Draw fire breath for Fygar
@@ -470,8 +452,8 @@ export class Renderer {
      */
     drawEnemySprite(sprite, centerX, centerY, flipH) {
         if (sprite && sprite.complete) {
-            const spriteWidth = sprite.naturalWidth || sprite.width;
-            const spriteHeight = sprite.naturalHeight || sprite.height;
+            const spriteWidth = sprite.naturalWidth;
+            const spriteHeight = sprite.naturalHeight;
 
             this.ctx.save();
             this.ctx.translate(centerX, centerY);
@@ -493,26 +475,9 @@ export class Renderer {
     /**
      * Draw enemy in smooshed state (crushed by rock)
      */
-    drawEnemySmooshed(enemy, px, py, centerX, centerY) {
+    drawEnemySmooshed(enemy, centerX, centerY) {
         const sprite = this.sprites[`${enemy.type}_smooshed`];
-
-        if (sprite && sprite.complete) {
-            if (enemy.spriteFlipH) {
-                this.ctx.save();
-                this.ctx.translate(centerX, centerY);
-                this.ctx.scale(-1, 1);
-                this.ctx.drawImage(
-                    sprite,
-                    -TILE_SIZE / 2,
-                    -TILE_SIZE / 2,
-                    TILE_SIZE,
-                    TILE_SIZE
-                );
-                this.ctx.restore();
-            } else {
-                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-            }
-        }
+        this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
     }
 
     /**
