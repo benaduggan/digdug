@@ -37,6 +37,10 @@ export class Enemy {
         this.lastGridX = -1;
         this.lastGridY = -1;
 
+        // Track the previous tile to prevent immediately returning to it
+        this.prevGridX = -1;
+        this.prevGridY = -1;
+
         // Track tiles traveled in current direction to prevent oscillation
         this.tilesTraveledInDirection = 0;
         this.minTilesBeforeReverse = 2; // Must travel at least 2 tiles before reversing
@@ -222,6 +226,9 @@ export class Enemy {
 
         // When entering a new tile, consider changing direction
         if (enteredNewTile) {
+            // Remember the tile we came from
+            this.prevGridX = this.lastGridX;
+            this.prevGridY = this.lastGridY;
             this.lastGridX = gx;
             this.lastGridY = gy;
             this.tilesTraveledInDirection++;
@@ -569,9 +576,10 @@ export class Enemy {
             return;
         }
 
-        // If only one valid direction, take it (dead end, must go back)
+        // If only one valid direction (dead end), don't change direction yet.
+        // Let the enemy keep moving until it hits the wall, then it will turn around
+        // via pickValidDirection. This makes enemies walk to the end of tunnels.
         if (validDirections.length === 1) {
-            this.direction = validDirections[0];
             return;
         }
 
@@ -593,8 +601,26 @@ export class Enemy {
         const viableDirections = validDirections.filter((d) =>
             this.isViableDirection(grid, gx, gy, d)
         );
+
+        // Also filter out the direction that leads back to the previous tile
+        // This prevents oscillation between two tiles
+        const directionToPrevTile = this.getDirectionToTile(
+            gx,
+            gy,
+            this.prevGridX,
+            this.prevGridY
+        );
+        const nonBacktrackDirections = viableDirections.filter(
+            (d) => d !== directionToPrevTile
+        );
+
+        // Use non-backtracking directions if available, otherwise fall back to viable, then valid
         const directionsToConsider =
-            viableDirections.length > 0 ? viableDirections : validDirections;
+            nonBacktrackDirections.length > 0
+                ? nonBacktrackDirections
+                : viableDirections.length > 0
+                  ? viableDirections
+                  : validDirections;
 
         const dx = player.x - this.x;
         const dy = player.y - this.y;
@@ -636,6 +662,21 @@ export class Enemy {
         } else if (directionsToConsider.length > 0) {
             this.direction = directionsToConsider[0];
         }
+    }
+
+    /**
+     * Get the direction from one tile to an adjacent tile
+     * Returns null if tiles are not adjacent or are the same
+     */
+    getDirectionToTile(fromGx, fromGy, toGx, toGy) {
+        const dx = toGx - fromGx;
+        const dy = toGy - fromGy;
+
+        if (dx === 1 && dy === 0) return DIRECTIONS.RIGHT;
+        if (dx === -1 && dy === 0) return DIRECTIONS.LEFT;
+        if (dx === 0 && dy === 1) return DIRECTIONS.DOWN;
+        if (dx === 0 && dy === -1) return DIRECTIONS.UP;
+        return null;
     }
 
     /**
@@ -727,17 +768,45 @@ export class Enemy {
      * Roam behavior when entering a new tile
      */
     roamAtTile(grid, gx, gy) {
-        // Only change direction occasionally
-        if (this.directionChangeTimer < 1000 + Math.random() * 1000) {
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
+
+        if (validDirections.length === 0) return;
+
+        // If only one direction (dead end), don't change direction yet.
+        // Let the enemy keep moving until it hits the wall, then it will turn around.
+        if (validDirections.length === 1) {
+            return;
+        }
+
+        // Filter out direction back to previous tile to avoid oscillation
+        const directionToPrevTile = this.getDirectionToTile(
+            gx,
+            gy,
+            this.prevGridX,
+            this.prevGridY
+        );
+        const forwardDirections = validDirections.filter(
+            (d) => d !== directionToPrevTile
+        );
+
+        // Use forward directions if available
+        const directionsToConsider =
+            forwardDirections.length > 0 ? forwardDirections : validDirections;
+
+        // Only change direction occasionally, unless current direction is invalid
+        const currentIsValid = directionsToConsider.includes(this.direction);
+        if (
+            currentIsValid &&
+            this.directionChangeTimer < 1000 + Math.random() * 1000
+        ) {
             return;
         }
         this.directionChangeTimer = 0;
 
-        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
-        if (validDirections.length > 0) {
+        if (directionsToConsider.length > 0) {
             this.direction =
-                validDirections[
-                    Math.floor(Math.random() * validDirections.length)
+                directionsToConsider[
+                    Math.floor(Math.random() * directionsToConsider.length)
                 ];
         }
     }
@@ -843,16 +912,26 @@ export class Enemy {
             const dx = player.x - this.x;
             const dy = player.y - this.y;
 
-            let preferredDirection;
+            // Determine primary and secondary preferred directions
+            let primaryDirection, secondaryDirection;
             if (Math.abs(dx) > Math.abs(dy)) {
-                preferredDirection =
-                    dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+                primaryDirection = dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
+                secondaryDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
             } else {
-                preferredDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+                primaryDirection = dy > 0 ? DIRECTIONS.DOWN : DIRECTIONS.UP;
+                secondaryDirection =
+                    dx > 0 ? DIRECTIONS.RIGHT : DIRECTIONS.LEFT;
             }
 
-            if (validDirections.includes(preferredDirection)) {
-                this.direction = preferredDirection;
+            // Try primary direction first
+            if (validDirections.includes(primaryDirection)) {
+                this.direction = primaryDirection;
+                return;
+            }
+
+            // Try secondary direction (helps navigate around obstacles)
+            if (validDirections.includes(secondaryDirection)) {
+                this.direction = secondaryDirection;
                 return;
             }
         }
