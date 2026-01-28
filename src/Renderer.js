@@ -384,7 +384,7 @@ export class Renderer {
 
         // Handle popped state (after full inflation)
         if (enemy.isPopped) {
-            this.drawEnemyPopped(enemy, px, py, centerX, centerY);
+            this.drawEnemyPopped(enemy, centerX, centerY);
             return;
         }
 
@@ -419,11 +419,7 @@ export class Renderer {
                     // No flip - draw directly
                     this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
                 }
-            } else {
-                this.drawEnemyFallback(enemy, centerX, centerY);
             }
-        } else {
-            this.drawEnemyFallback(enemy, centerX, centerY);
         }
 
         // Draw fire breath for Fygar
@@ -457,17 +453,30 @@ export class Renderer {
         const spriteName = `${enemy.type}_inflating_${stage}`;
         const sprite = this.sprites[spriteName];
 
+        this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
+    }
+
+    /**
+     * Draw enemy in popped state (after full inflation)
+     */
+    drawEnemyPopped(enemy, centerX, centerY) {
+        const sprite = this.sprites[`${enemy.type}_popped`];
+        this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
+    }
+
+    /**
+     * Helper to draw enemy sprite with flipping
+     * and renders at natural size
+     */
+    drawEnemySprite(sprite, centerX, centerY, flipH) {
         if (sprite && sprite.complete) {
+            const spriteWidth = sprite.naturalWidth || sprite.width;
+            const spriteHeight = sprite.naturalHeight || sprite.height;
+
             this.ctx.save();
             this.ctx.translate(centerX, centerY);
 
-            if (enemy.spriteFlipH) {
-                this.ctx.scale(-1, 1);
-            }
-
-            // Use sprite's natural dimensions instead of forcing TILE_SIZE
-            const spriteWidth = sprite.naturalWidth || sprite.width;
-            const spriteHeight = sprite.naturalHeight || sprite.height;
+            if (flipH) this.ctx.scale(-1, 1);
 
             this.ctx.drawImage(
                 sprite,
@@ -478,34 +487,6 @@ export class Renderer {
             );
 
             this.ctx.restore();
-        } else {
-            // Fallback: draw inflated circle
-            this.drawEnemyFallback(enemy, centerX, centerY);
-        }
-    }
-
-    /**
-     * Draw enemy in popped state (after full inflation)
-     */
-    drawEnemyPopped(enemy, px, py, centerX, centerY) {
-        const sprite = this.sprites[`${enemy.type}_popped`];
-
-        if (sprite && sprite.complete) {
-            if (enemy.spriteFlipH) {
-                this.ctx.save();
-                this.ctx.translate(centerX, centerY);
-                this.ctx.scale(-1, 1);
-                this.ctx.drawImage(
-                    sprite,
-                    -TILE_SIZE / 2,
-                    -TILE_SIZE / 2,
-                    TILE_SIZE,
-                    TILE_SIZE
-                );
-                this.ctx.restore();
-            } else {
-                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-            }
         }
     }
 
@@ -531,26 +512,6 @@ export class Renderer {
             } else {
                 this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
             }
-        }
-    }
-
-    drawEnemyFallback(enemy, centerX, centerY) {
-        if (enemy.type === ENEMY_TYPES.POOKA) {
-            // Red circle for Pooka
-            this.ctx.fillStyle = enemy.isGhosting
-                ? 'rgba(231, 76, 60, 0.5)'
-                : '#e74c3c';
-            this.ctx.beginPath();
-            this.ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
-            this.ctx.fill();
-        } else if (enemy.type === ENEMY_TYPES.FYGAR) {
-            // Green circle for Fygar
-            this.ctx.fillStyle = enemy.isGhosting
-                ? 'rgba(46, 204, 113, 0.5)'
-                : '#2ecc71';
-            this.ctx.beginPath();
-            this.ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
-            this.ctx.fill();
         }
     }
 
@@ -743,7 +704,7 @@ export class Renderer {
     /**
      * Draw UI elements (score, lives, level) with Press Start 2P font
      */
-    drawUI(scoreManager) {
+    drawUI(scoreManager, levelManager) {
         const padding = 8;
         const fontSize = 8; // Smaller for Press Start 2P font
 
@@ -788,7 +749,7 @@ export class Renderer {
 
         // Level (center)
         this.drawText(
-            `LVL ${scoreManager.level}`,
+            `LVL ${levelManager.currentLevel}`,
             CANVAS_WIDTH / 2,
             padding + fontSize + 4,
             {

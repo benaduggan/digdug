@@ -3,7 +3,6 @@ import {
     GRID_HEIGHT,
     TILE_SIZE,
     LEVEL,
-    TILE_TYPES,
 } from '../utils/constants.js';
 import { Pooka } from '../entities/Pooka.js';
 import { Fygar } from '../entities/Fygar.js';
@@ -26,23 +25,19 @@ export class LevelManager {
         this.currentEnemies = []; // Store for rock placement
 
         // Create initial tunnels
-        this.generateTunnels(levelNumber);
-
-        // Note: Rocks will be placed AFTER enemies are spawned
-        // See placeRocksAfterEnemies() method
+        this.generateTunnels();
     }
 
     /**
      * Generate tunnel network
      */
-    generateTunnels(levelNumber) {
+    generateTunnels() {
         // Create a small starting tunnel for the player in the center
         const centerX = Math.floor(GRID_WIDTH / 2);
         const centerY = Math.floor(GRID_HEIGHT / 2);
 
         // Small 3-tile cross pattern for player start
         this.grid.clearHorizontalTunnel(centerX - 1, centerX + 1, centerY);
-        this.grid.clearVerticalTunnel(centerX, centerY - 1, centerY + 1);
 
         // Store player start tunnel location
         this.playerStartTunnel = { x: centerX, y: centerY };

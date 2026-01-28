@@ -4,7 +4,6 @@ export class ScoreManager {
     constructor() {
         this.score = 0;
         this.lives = PLAYER.START_LIVES;
-        this.level = 1;
         this.highScore = this.loadHighScore();
     }
 
@@ -14,7 +13,6 @@ export class ScoreManager {
     reset() {
         this.score = 0;
         this.lives = PLAYER.START_LIVES;
-        this.level = 1;
     }
 
     /**
@@ -76,13 +74,6 @@ export class ScoreManager {
      */
     gainLife() {
         this.lives++;
-    }
-
-    /**
-     * Advance to next level
-     */
-    nextLevel() {
-        this.level++;
     }
 
     /**

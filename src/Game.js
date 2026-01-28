@@ -692,7 +692,7 @@ export class Game {
         });
 
         // Draw UI
-        this.renderer.drawUI(this.scoreManager);
+        this.renderer.drawUI(this.scoreManager, this.levelManager);
 
         // Debug mode
         if (this.config.debug) {
@@ -726,7 +726,7 @@ export class Game {
     renderLevelComplete() {
         this.render();
         this.renderer.drawText(
-            'LEVEL',
+            `LEVEL ${this.levelManager.currentLevel} `,
             CANVAS_WIDTH / 2,
             CANVAS_HEIGHT / 2 - 10,
             {
