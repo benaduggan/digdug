@@ -18,10 +18,10 @@ if (typeof window !== 'undefined') {
             scale: 2,
             debug: false,
             onGameOver: (score) => {
-                console.log('Game Over! Final Score:', score);
+                // console.log('Game Over! Final Score:', score);
             },
             onLevelComplete: (level) => {
-                console.log('Level', level, 'Complete!');
+                // console.log('Level', level, 'Complete!');
             },
             onScoreChange: (score) => {
                 // Could update external UI here

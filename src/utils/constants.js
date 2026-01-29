@@ -4,10 +4,12 @@ export const GRID_WIDTH = 27;
 export const GRID_HEIGHT = 18;
 export const CANVAS_WIDTH = GRID_WIDTH * TILE_SIZE;
 export const CANVAS_HEIGHT = GRID_HEIGHT * TILE_SIZE;
+export const HI_SCORE_KEY = 'digdug_highscore';
 
 // Game states
 export const GAME_STATES = {
     MENU: 'menu',
+    INTRO: 'intro', // Starting animation before gameplay
     PLAYING: 'playing',
     PAUSED: 'paused',
     DYING: 'dying',
@@ -76,11 +78,11 @@ export const SCORES = {
 // Colors (arcade-accurate)
 export const COLORS = {
     BACKGROUND: '#000000',
-    SKY: '#274ac0', // Blue sky for top rows
-    DIRT_LIGHT: '#8B7355',
-    DIRT_MID: '#6B5344',
-    DIRT_DARK: '#4B3A2F',
-    DIRT_DARKEST: '#39312a',
+    SKY: 'rgb(0, 0, 145)', // Blue sky for top rows
+    DIRT_LIGHT: 'rgb(244, 187, 64)',
+    DIRT_MID: 'rgb(207, 111, 41)',
+    DIRT_DARK: 'rgb(169, 49, 24)',
+    DIRT_DARKEST: 'rgb(138, 26, 16)',
     PLAYER_BLUE: '#3498db',
     PLAYER_WHITE: '#ffffff',
     POOKA_RED: '#e74c3c',
@@ -89,7 +91,7 @@ export const COLORS = {
     FYGAR_RED: '#e74c3c',
     ROCK_GRAY: '#95a5a6',
     TEXT_WHITE: '#ffffff',
-    TEXT_YELLOW: '#f1c40f',
+    TEXT_RED: '#e33122',
 };
 
 // Animation settings
@@ -101,9 +103,9 @@ export const ANIMATION = {
 
 // Rock physics
 export const ROCK = {
-    FALL_DELAY: 400, // 400ms delay before rock falls after player triggers it
+    FALL_DELAY: 300, // 400ms delay before rock falls after player triggers it
     FALL_SPEED: 3, // Pixels per frame when falling
-    SHAKE_DURATION: 750, // ms rock shakes before falling (triggered by player from below)
+    SHAKE_DURATION: 200, // ms rock shakes before falling (triggered by player from below)
 };
 
 // Level settings

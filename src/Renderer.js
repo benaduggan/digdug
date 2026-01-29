@@ -7,6 +7,7 @@ import {
     DIRECTIONS,
     DEATH,
     ENEMY_TYPES,
+    GRID_WIDTH,
 } from './utils/constants.js';
 
 export class Renderer {
@@ -79,6 +80,7 @@ export class Renderer {
             'fygar_smooshed.png',
             'rock_1.png',
             'rock_2.png',
+            'flower_small.png',
         ];
 
         let loadedCount = 0;
@@ -646,7 +648,7 @@ export class Renderer {
         const py = item.y;
 
         // Draw simple bonus item (yellow circle/fruit)
-        this.ctx.fillStyle = COLORS.TEXT_YELLOW;
+        this.ctx.fillStyle = COLORS.TEXT_RED;
         this.ctx.beginPath();
         this.ctx.arc(
             px + TILE_SIZE / 2,
@@ -670,59 +672,72 @@ export class Renderer {
      * Draw UI elements (score, lives, level) with Press Start 2P font
      */
     drawUI(scoreManager, levelManager) {
-        const padding = 8;
-        const fontSize = 8; // Smaller for Press Start 2P font
-
         // Score (left)
-        this.drawText(
-            `${scoreManager.score}`,
-            padding,
-            padding + fontSize + 4,
-            {
-                size: fontSize,
-                color: COLORS.TEXT_WHITE,
-                align: 'left',
-            }
-        );
-        this.drawText('SCORE', padding, padding + fontSize + 16, {
+        this.drawText('1UP', 4, 10, {
             size: 6,
-            color: COLORS.TEXT_YELLOW,
+            color: COLORS.TEXT_RED,
+            align: 'left',
+        });
+        this.drawText(`${scoreManager.score}`.padStart(2, '0'), 4, 20, {
+            size: 8,
+            color: COLORS.TEXT_WHITE,
             align: 'left',
         });
 
-        // Lives (right)
+        // Lives
+        if (this.spritesLoaded) {
+            const sprite = this.sprites['player_digging_horizontal_1'];
+            if (sprite && sprite.complete) {
+                for (let i = 1; i < scoreManager.lives; i++) {
+                    const x = TILE_SIZE * 1.75 + (i - 1) * TILE_SIZE;
+                    const y = 0;
+                    this.ctx.drawImage(sprite, x, y, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+
+        // Hi-score (center)
+        this.drawText('HI SCORE', CANVAS_WIDTH / 2, 10, {
+            size: 6,
+            color: COLORS.TEXT_RED,
+            align: 'center',
+        });
         this.drawText(
-            `${scoreManager.lives}`,
-            CANVAS_WIDTH - padding,
-            padding + fontSize + 4,
+            `${scoreManager.highScore}`.padStart(2, '0'),
+            CANVAS_WIDTH / 2,
+            20,
             {
-                size: fontSize,
+                size: 8,
+                color: COLORS.TEXT_WHITE,
+                align: 'center',
+            }
+        );
+
+        this.drawText(
+            `ROUND ${levelManager.currentLevel}`,
+            CANVAS_WIDTH - 4,
+            10,
+            {
+                size: 6,
                 color: COLORS.TEXT_WHITE,
                 align: 'right',
             }
         );
-        this.drawText(
-            'LIVES',
-            CANVAS_WIDTH - padding,
-            padding + fontSize + 16,
-            {
-                size: 6,
-                color: COLORS.TEXT_YELLOW,
-                align: 'right',
-            }
-        );
 
-        // Level (center)
-        this.drawText(
-            `LVL ${levelManager.currentLevel}`,
-            CANVAS_WIDTH / 2,
-            padding + fontSize + 4,
-            {
-                size: fontSize,
-                color: COLORS.TEXT_YELLOW,
-                align: 'center',
+        if (this.spritesLoaded) {
+            const sprite = this.sprites['flower_small'];
+            if (sprite && sprite.complete) {
+                for (let i = 1; i <= levelManager.currentLevel; i++) {
+                    this.ctx.drawImage(
+                        sprite,
+                        CANVAS_WIDTH - TILE_SIZE * i,
+                        TILE_SIZE,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    );
+                }
             }
-        );
+        }
     }
 
     /**
@@ -745,16 +760,21 @@ export class Renderer {
     renderRespawning() {
         // Note: Game.js should call this.render() first, then this overlay
         // Overlay "Player 1 Ready" message
-        this.drawText('PLAYER 1', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 10, {
+        this.drawText('PLAYER 1', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 3, {
             size: 10,
-            color: COLORS.TEXT_YELLOW,
+            color: COLORS.TEXT_WHITE,
             align: 'center',
         });
-        this.drawText('READY', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 10, {
-            size: 10,
-            color: COLORS.TEXT_YELLOW,
-            align: 'center',
-        });
+        this.drawText(
+            'READY!',
+            CANVAS_WIDTH / 2,
+            CANVAS_HEIGHT / 2 + TILE_SIZE + 15,
+            {
+                size: 10,
+                color: COLORS.TEXT_WHITE,
+                align: 'center',
+            }
+        );
     }
 
     /**

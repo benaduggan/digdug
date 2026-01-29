@@ -1,4 +1,4 @@
-import { TILE_SIZE } from '../utils/constants.js';
+import { DIRECTIONS, TILE_SIZE } from '../utils/constants.js';
 
 export class CollisionSystem {
     constructor(grid) {
@@ -16,15 +16,16 @@ export class CollisionSystem {
      * Check collision between player and enemy
      */
     checkPlayerEnemyCollision(player, enemy) {
+        const buffer = 6;
         return this.checkAABB(
             player.x,
             player.y,
-            TILE_SIZE,
-            TILE_SIZE,
+            TILE_SIZE - buffer,
+            TILE_SIZE - buffer,
             enemy.x,
             enemy.y,
-            TILE_SIZE,
-            TILE_SIZE
+            TILE_SIZE - buffer,
+            TILE_SIZE - buffer
         );
     }
 
@@ -78,13 +79,13 @@ export class CollisionSystem {
         const dy = target.y - entity.y;
 
         switch (direction) {
-            case 'up':
+            case DIRECTIONS.UP:
                 return dy < 0 && Math.abs(dy) > Math.abs(dx);
-            case 'down':
+            case DIRECTIONS.DOWN:
                 return dy > 0 && Math.abs(dy) > Math.abs(dx);
-            case 'left':
+            case DIRECTIONS.LEFT:
                 return dx < 0 && Math.abs(dx) > Math.abs(dy);
-            case 'right':
+            case DIRECTIONS.RIGHT:
                 return dx > 0 && Math.abs(dx) > Math.abs(dy);
             default:
                 return false;

@@ -55,6 +55,7 @@ export class Enemy {
         this.inflateLevel = 1.0;
         this.inflateTimer = 0;
         this.INFLATE_DURATION = 1200; // 1.2 seconds to full inflation
+        this.deflateTimer = 0;
 
         // Popped state (after full inflation)
         this.isPopped = false;
@@ -1069,7 +1070,7 @@ export class Enemy {
             }
         } else if (this.inflateLevel > 1.0) {
             // Not being pumped - deflate slowly
-            this.deflateTimer = (this.deflateTimer || 0) + deltaTime;
+            this.deflateTimer += deltaTime;
 
             // Start deflating after a short pause
             if (this.deflateTimer > 300) {
@@ -1084,6 +1085,7 @@ export class Enemy {
                     // Fully deflated - can move again
                     this.inflateLevel = 1.0;
                     this.inflateTimer = 0;
+                    this.deflateTimer = 0;
                     this.isMoving = true;
                 }
             }

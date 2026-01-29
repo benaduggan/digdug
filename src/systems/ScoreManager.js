@@ -1,4 +1,9 @@
-import { ENEMY_TYPES, PLAYER, SCORES } from '../utils/constants.js';
+import {
+    ENEMY_TYPES,
+    HI_SCORE_KEY,
+    PLAYER,
+    SCORES,
+} from '../utils/constants.js';
 
 export class ScoreManager {
     constructor() {
@@ -56,10 +61,6 @@ export class ScoreManager {
      */
     addScore(points) {
         this.score += points;
-        if (this.score > this.highScore) {
-            this.highScore = this.score;
-            this.saveHighScore();
-        }
     }
 
     /**
@@ -81,7 +82,7 @@ export class ScoreManager {
      */
     loadHighScore() {
         try {
-            const saved = localStorage.getItem('digdug_highscore');
+            const saved = localStorage.getItem(HI_SCORE_KEY);
             return saved ? parseInt(saved, 10) : 0;
         } catch (e) {
             return 0;
@@ -93,7 +94,7 @@ export class ScoreManager {
      */
     saveHighScore() {
         try {
-            localStorage.setItem('digdug_highscore', this.highScore.toString());
+            localStorage.setItem(HI_SCORE_KEY, this.highScore.toString());
         } catch (e) {
             // Ignore localStorage errors
         }

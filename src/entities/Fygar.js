@@ -93,7 +93,12 @@ export class Fygar extends Enemy {
             }
 
             // Check if player is in fire range and horizontally aligned
-            if (this.isPlayerInFireRange(player)) {
+            if (
+                ((this.direction === DIRECTIONS.RIGHT && this.x < player.x) ||
+                    (this.direction === DIRECTIONS.LEFT &&
+                        this.x > player.x)) &&
+                this.isPlayerInFireRange(player)
+            ) {
                 this.startCharging();
             }
             return;

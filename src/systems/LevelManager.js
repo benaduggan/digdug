@@ -38,6 +38,8 @@ export class LevelManager {
 
         // Small 3-tile cross pattern for player start
         this.grid.clearHorizontalTunnel(centerX - 1, centerX + 1, centerY);
+        if (this.currentLevel > 1)
+            this.grid.clearVerticalTunnel(centerX, 2, centerY);
 
         // Store player start tunnel location
         this.playerStartTunnel = { x: centerX, y: centerY };
@@ -53,6 +55,8 @@ export class LevelManager {
             6
         );
         const minRocks = 3; // Must have at least 3 boulders
+        const isDisallowedColumn = (x) =>
+            x >= GRID_WIDTH / 2 - 2 && x <= GRID_WIDTH / 2 + 2;
 
         this.rocks = []; // Reset rocks array
 
@@ -81,6 +85,12 @@ export class LevelManager {
                 }
                 const x = Math.floor(Math.random() * (GRID_WIDTH - 8)) + 4;
                 const y = Math.floor(Math.random() * (GRID_HEIGHT - 10)) + 5;
+
+                // Don't allow rocks within the middle 5 columns
+                if (isDisallowedColumn(x)) {
+                    attempts++;
+                    continue;
+                }
 
                 // Rock position must be dirt
                 if (!this.grid.isDirt(x, y)) {
@@ -386,11 +396,11 @@ export class LevelManager {
             const tunnel = this.enemyTunnels[enemyIndex];
             // Spawn in the middle of their tunnel
             const offsetX = tunnel.horizontal
-                ? Math.floor(tunnel.length / 2)
+                ? Math.floor(Math.random() * tunnel.length)
                 : 0;
             const offsetY = tunnel.horizontal
                 ? 0
-                : Math.floor(tunnel.length / 2);
+                : Math.floor(Math.random() * tunnel.length);
 
             const gridX = tunnel.x + offsetX;
             const gridY = tunnel.y + offsetY;

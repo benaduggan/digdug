@@ -6,6 +6,7 @@ import {
     DEATH,
     TILE_SIZE,
     ENEMY_TYPES,
+    DIRECTIONS,
 } from './utils/constants.js';
 import { Renderer } from './Renderer.js';
 import { Grid } from './utils/Grid.js';
@@ -76,7 +77,7 @@ export class Game {
             CANVAS_HEIGHT / 2 - 60,
             {
                 size: 16,
-                color: COLORS.TEXT_YELLOW,
+                color: COLORS.TEXT_RED,
                 align: 'center',
             }
         );
@@ -145,15 +146,55 @@ export class Game {
             this.animationFrameId = null;
         }
 
-        this.state = GAME_STATES.PLAYING;
         this.scoreManager.reset();
         this.lastTime = 0; // Reset time tracking
-        this.startLevel(1);
 
-        // Reset all timers to start fresh
-        this.resetAllTimers();
+        // Start the intro animation instead of jumping straight to playing
+        this.startIntro();
 
         this.gameLoop(0);
+    }
+
+    /**
+     * Start the intro animation sequence
+     */
+    startIntro() {
+        this.state = GAME_STATES.INTRO;
+
+        // Generate the actual level first (creates tunnels, but we'll add player's tunnel too)
+        this.levelManager.generateLevel(1);
+
+        // Create enemies (spawned in tunnels, but frozen during intro)
+        this.enemies = this.levelManager.spawnEnemies(1);
+
+        // Create rocks AFTER enemies
+        this.levelManager.placeRocksAfterEnemies(1, this.enemies);
+        this.rocks = this.levelManager.getRocks();
+
+        // Clear bonus items
+        this.bonusItems = [];
+
+        // Reset dropped rocks counter
+        this.droppedRocksCount = 0;
+
+        // Calculate target positions for player
+        this.introCenterX = Math.floor(this.grid.width / 2); // Center column
+        this.introCenterY = Math.floor(this.grid.height / 2); // Center row
+        this.introTargetX = this.introCenterX * TILE_SIZE; // Pixel position for center
+        this.introTargetY = this.introCenterY * TILE_SIZE;
+
+        // Create player at the right edge of row 1 (in the sky)
+        this.player = new Player(this.grid);
+        this.player.x = this.grid.width * TILE_SIZE; // Start off-screen right
+        this.player.y = TILE_SIZE; // Row 1 (second row, in the sky)
+        this.player.direction = DIRECTIONS.LEFT;
+        this.player.spriteFlipH = false;
+        this.player.isMoving = true;
+
+        // Intro animation state
+        this.introPhase = 'walk_left'; // 'walk_left', 'dig_down', 'dig_tunnel', 'ready', 'done'
+        this.introTimer = 0;
+        this.introReadyDelay = 1000; // 1 second delay after reaching position
     }
 
     /**
@@ -206,6 +247,10 @@ export class Game {
 
         // Update and render based on game state
         switch (this.state) {
+            case GAME_STATES.INTRO:
+                this.updateIntro(deltaTime);
+                this.renderIntro();
+                break;
             case GAME_STATES.PLAYING:
                 this.update(deltaTime);
                 this.render();
@@ -234,10 +279,127 @@ export class Game {
     }
 
     /**
+     * Update intro animation
+     */
+    updateIntro(deltaTime) {
+        const speed = 1.5; // Player movement speed during intro
+
+        if (this.introPhase !== 'ready') {
+            // Update player animation
+            this.player.animationTimer += deltaTime;
+            if (this.player.animationTimer > 100) {
+                this.player.animationFrame =
+                    (this.player.animationFrame + 1) % 2;
+                this.player.animationTimer = 0;
+            }
+        }
+
+        switch (this.introPhase) {
+            case 'walk_left':
+                // Walk left across the sky to center column
+                this.player.x -= speed;
+                this.player.isMoving = true;
+                this.player.direction = DIRECTIONS.LEFT;
+                this.player.spriteFlipH = false;
+
+                if (this.player.x <= this.introTargetX) {
+                    this.player.x = this.introTargetX;
+                    this.introPhase = 'dig_down';
+                    this.player.direction = DIRECTIONS.DOWN;
+                    this.player.spriteFlipH = false;
+                    this.player.spriteFlipV = false;
+                }
+                break;
+
+            case 'dig_down': {
+                // Dig straight down to center row
+                this.player.y += speed;
+                this.player.isMoving = true;
+                this.player.isDigging = true;
+                this.player.direction = DIRECTIONS.DOWN;
+
+                // Dig the tile we're moving through
+                const currentTile = this.grid.pixelToGrid(
+                    this.player.x + TILE_SIZE / 2,
+                    this.player.y + TILE_SIZE / 2
+                );
+                this.grid.dig(currentTile.x, currentTile.y);
+
+                if (this.player.y >= this.introTargetY) {
+                    this.player.y = this.introTargetY;
+                    // Stop in center and go directly to ready phase
+                    this.introPhase = 'ready';
+                    this.introTimer = 0;
+                    this.player.isMoving = false;
+                    this.player.isDigging = false;
+                    this.player.direction = DIRECTIONS.RIGHT;
+                    this.player.spriteFlipH = true;
+                }
+                break;
+            }
+
+            case 'ready':
+                this.player.animationFrame = 0;
+                this.introTimer += deltaTime;
+                if (this.introTimer >= this.introReadyDelay) {
+                    this.introPhase = 'done';
+                    this.finishIntro();
+                }
+                break;
+        }
+    }
+
+    /**
+     * Finish intro and start actual gameplay
+     */
+    finishIntro() {
+        // Level is already set up from startIntro - just reset timers and start
+
+        // Reset player timers
+        this.player.resetTimers();
+
+        // Reset all timers (unfreezes enemies)
+        this.resetAllTimers();
+
+        // Start playing
+        this.state = GAME_STATES.PLAYING;
+    }
+
+    /**
+     * Render intro animation
+     */
+    renderIntro() {
+        this.renderer.clear();
+
+        // Draw grid (shows the tunnel being dug)
+        this.renderer.drawGrid(this.grid);
+
+        // Draw rocks (already placed)
+        this.rocks.forEach((rock) => {
+            this.renderer.drawRock(rock);
+        });
+
+        // Draw player
+        if (this.player) {
+            this.renderer.drawPlayer(this.player);
+        }
+
+        // Draw enemies (frozen but visible)
+        this.enemies.forEach((enemy) => {
+            this.renderer.drawEnemy(enemy);
+        });
+
+        // Draw UI
+        this.renderer.drawUI(this.scoreManager, this.levelManager);
+
+        // Always show "Player 1 Ready" during intro
+        this.renderer.renderRespawning();
+    }
+
+    /**
      * Update game state
      */
     update(deltaTime) {
-        // Check for pause
         if (this.inputManager.isKeyPressed('Escape')) {
             this.pause();
             return;
@@ -290,27 +452,17 @@ export class Game {
         this.checkFireCollisions();
 
         // Player-enemy collisions
-        this.enemies = this.enemies.filter((enemy) => {
+        this.enemies.forEach((enemy) => {
             if (
+                enemy.deflateTimer === 0 &&
                 this.collisionSystem.checkPlayerEnemyCollision(
                     this.player,
                     enemy
                 )
             ) {
-                if (enemy.isInflating) {
-                    // Enemy defeated
-                    const points = this.scoreManager.addEnemyKill(
-                        enemy.type,
-                        enemy.distanceFromPlayer
-                    );
-                    this.config.onScoreChange(this.scoreManager.score);
-                    return false; // Remove enemy
-                } else {
-                    // Player hit by enemy
-                    this.playerHit('enemy');
-                }
+                // Player hit by enemy
+                this.playerHit('enemy');
             }
-            return true;
         });
 
         // Rock-entity collisions
@@ -644,6 +796,10 @@ export class Game {
     gameOver() {
         this.state = GAME_STATES.GAME_OVER;
         this.config.onGameOver(this.scoreManager.score);
+        if (this.scoreManager.score > this.scoreManager.highScore) {
+            this.scoreManager.highScore = this.scoreManager.score;
+            this.scoreManager.saveHighScore();
+        }
     }
 
     /**
@@ -657,9 +813,7 @@ export class Game {
      * Resume the game
      */
     resume() {
-        if (this.state === GAME_STATES.PAUSED) {
-            this.state = GAME_STATES.PLAYING;
-        }
+        this.state = GAME_STATES.PLAYING;
     }
 
     /**
@@ -704,10 +858,15 @@ export class Game {
      * Render paused state
      */
     renderPaused() {
+        if (this.inputManager.isKeyPressed('Escape')) {
+            this.resume();
+            return;
+        }
+
         this.render();
         this.renderer.drawText('PAUSED', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, {
             size: 16,
-            color: COLORS.TEXT_YELLOW,
+            color: COLORS.TEXT_WHITE,
             align: 'center',
         });
     }
@@ -731,7 +890,7 @@ export class Game {
             CANVAS_HEIGHT / 2 - 10,
             {
                 size: 12,
-                color: COLORS.TEXT_YELLOW,
+                color: COLORS.TEXT_WHITE,
                 align: 'center',
             }
         );
@@ -741,7 +900,7 @@ export class Game {
             CANVAS_HEIGHT / 2 + 10,
             {
                 size: 12,
-                color: COLORS.TEXT_YELLOW,
+                color: COLORS.TEXT_WHITE,
                 align: 'center',
             }
         );
@@ -758,7 +917,7 @@ export class Game {
             CANVAS_HEIGHT / 2 - 40,
             {
                 size: 12,
-                color: COLORS.TEXT_YELLOW,
+                color: COLORS.TEXT_RED,
                 align: 'center',
             }
         );
@@ -773,7 +932,7 @@ export class Game {
             CANVAS_HEIGHT / 2 + 20,
             {
                 size: 10,
-                color: COLORS.TEXT_YELLOW,
+                color: COLORS.TEXT_RED,
                 align: 'center',
             }
         );
