@@ -235,7 +235,7 @@ export class Game {
      * Update intro animation
      */
     updateIntro(deltaTime) {
-        const speed = 1.5; // Player movement speed during intro
+        const speed = this.config.debug ? 3 : 1.6; // Player movement speed during intro
 
         if (this.introPhase !== 'ready') {
             // Update player animation

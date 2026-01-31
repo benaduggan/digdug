@@ -127,9 +127,9 @@ export class Player {
         }
 
         // Update animation
-        if (this.isMoving) {
+        if (this.isMoving || this.isPumping) {
             this.animationTimer += deltaTime;
-            if (this.animationTimer > 100) {
+            if (this.animationTimer > (this.isMoving ? 100 : 200)) {
                 this.animationFrame = (this.animationFrame + 1) % 2;
                 this.animationTimer = 0;
             }
@@ -419,8 +419,6 @@ export class Player {
      * Retract pump line when Space is released
      */
     retractPump() {
-        this.isShooting = false;
-
         // If the target was destroyed (popped), immediately clear the pump
         if (this.pumpTarget && this.pumpTarget.isDestroyed) {
             this.pumpLength = 0;
@@ -438,6 +436,7 @@ export class Player {
      * Stop pumping
      */
     stopPump() {
+        this.isShooting = false;
         this.isPumping = false;
         this.pumpTarget = null;
         this.pumpLength = 0;

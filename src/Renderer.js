@@ -63,10 +63,10 @@ export class Renderer {
             'player_pumping_horizontal_2.png',
             'player_pumping_vertical_1.png',
             'player_pumping_vertical_2.png',
-            'hose_horizontal_1.png',
-            'hose_horizontal_2.png',
-            'hose_vertical_1.png',
-            'hose_vertical_2.png',
+            'hose_line_horizontal.png',
+            'hose_line_vertical.png',
+            'hose_nozzle_horizontal.png',
+            'hose_nozzle_vertical.png',
             'pooka_walking_1.png',
             'pooka_walking_2.png',
             'pooka_ghosting_1.png',
@@ -276,6 +276,16 @@ export class Renderer {
     }
 
     /**
+     * Get the player's orientation for sprite rendering
+     */
+    getPlayerOrientation(player) {
+        return player.direction === DIRECTIONS.LEFT ||
+            player.direction === DIRECTIONS.RIGHT
+            ? 'horizontal'
+            : 'vertical';
+    }
+
+    /**
      * Draw the player with walking sprites
      */
     drawPlayer(player) {
@@ -292,6 +302,11 @@ export class Renderer {
             if (!flickerVisible) return; // Skip rendering on flicker-off frames
         }
 
+        // Draw pump line if pumping
+        if (player.pumpLength > 0) {
+            this.drawPumpLine(player);
+        }
+
         const px = player.x;
         const py = player.y;
 
@@ -303,11 +318,7 @@ export class Renderer {
             else if (player.isPumping) spriteAction = 'pumping';
 
             let frameNumber = player.animationFrame === 0 ? '_1' : '_2';
-            const orientation =
-                player.direction === DIRECTIONS.LEFT ||
-                player.direction === DIRECTIONS.RIGHT
-                    ? 'horizontal'
-                    : 'vertical';
+            const orientation = this.getPlayerOrientation(player);
 
             if (player.isShooting) {
                 spriteAction = 'shooting';
@@ -324,22 +335,15 @@ export class Renderer {
                 const needsFlip = player.spriteFlipH || player.spriteFlipV;
 
                 if (needsFlip) {
-                    this.ctx.save();
                     const centerX = px + TILE_SIZE / 2;
                     const centerY = py + TILE_SIZE / 2;
-                    this.ctx.translate(centerX, centerY);
-                    this.ctx.scale(
-                        player.spriteFlipH ? -1 : 1,
-                        player.spriteFlipV ? -1 : 1
+                    this.drawFlippedSprite(
+                        centerX,
+                        centerY,
+                        player.spriteFlipH,
+                        player.spriteFlipV,
+                        sprite
                     );
-                    this.ctx.drawImage(
-                        sprite,
-                        -TILE_SIZE / 2,
-                        -TILE_SIZE / 2,
-                        TILE_SIZE,
-                        TILE_SIZE
-                    );
-                    this.ctx.restore();
                 } else {
                     // No flip needed - draw directly without save/restore
                     this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
@@ -354,11 +358,24 @@ export class Renderer {
             this.ctx.fillStyle = '#3498db';
             this.ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
+    }
 
-        // Draw pump line if pumping
-        if (player.pumpLength > 0) {
-            this.drawPumpLine(player);
-        }
+    /**
+     * Draw a horizontally or vertically flipped sprite
+     * at TILE_SIZE width and height
+     */
+    drawFlippedSprite(centerX, centerY, flipH, flipV, sprite) {
+        this.ctx.save();
+        this.ctx.translate(centerX, centerY);
+        this.ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+        this.ctx.drawImage(
+            sprite,
+            -TILE_SIZE / 2,
+            -TILE_SIZE / 2,
+            TILE_SIZE,
+            TILE_SIZE
+        );
+        this.ctx.restore();
     }
 
     /**
@@ -402,23 +419,125 @@ export class Renderer {
      * Draw pump line extending from player
      */
     drawPumpLine(player) {
-        const startX = player.x + TILE_SIZE / 2;
-        const startY = player.y + TILE_SIZE / 2;
+        // 1. Early exit if system isn't ready
+        if (!this.spritesLoaded) return;
+
+        // 2. Cache constants and frequently accessed properties
+        const TILE = TILE_SIZE;
+        const halfTile = TILE / 2;
+        const px = player.x;
+        const py = player.y;
         const endPoint = player.getPumpEndPoint();
+        const ctx = this.ctx;
 
-        // Draw the pump line
-        this.ctx.strokeStyle = COLORS.PLAYER_WHITE;
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.moveTo(startX, startY);
-        this.ctx.lineTo(endPoint.x, endPoint.y);
-        this.ctx.stroke();
+        // 3. Resolve orientation and sprites immediately
+        const orientation = this.getPlayerOrientation(player);
+        const nozzleSprite = this.sprites[`hose_nozzle_${orientation}`];
+        const lineSprite = this.sprites[`hose_line_${orientation}`];
 
-        // Draw pump head (small circle at the end)
-        this.ctx.fillStyle = COLORS.PLAYER_WHITE;
-        this.ctx.beginPath();
-        this.ctx.arc(endPoint.x, endPoint.y, 4, 0, Math.PI * 2);
-        this.ctx.fill();
+        // Check validity before proceeding with math
+        if (
+            !nozzleSprite ||
+            !nozzleSprite.complete ||
+            !lineSprite ||
+            !lineSprite.complete
+        ) {
+            return;
+        }
+
+        // 4. Calculate Grid Difference
+        // startX/Y logic inlined here
+        const diffX = Math.round((px + halfTile - endPoint.x) / TILE);
+        const diffY = Math.round((py + halfTile - endPoint.y) / TILE);
+
+        // Cache Flip states
+        const flipH = player.spriteFlipH;
+        const flipV = player.spriteFlipV;
+
+        // Helper to calculate segments count (exclude the nozzle itself)
+        // If diff is -2 (2 tiles away), we need 1 line segment. |diff| - 1.
+
+        // --- DOWN (Player looking DOWN) ---
+        if (diffY < 0) {
+            let segments = Math.abs(diffY) - 1;
+
+            if (flipH) {
+                const dx = px + halfTile;
+                let dy = endPoint.y - TILE * 0.25;
+
+                this.drawFlippedSprite(dx, dy, flipH, flipV, nozzleSprite);
+
+                while (segments > 0) {
+                    dy -= TILE;
+                    this.drawFlippedSprite(dx, dy, flipH, flipV, lineSprite);
+                    segments--;
+                }
+            } else {
+                const dx = px;
+                let dy = endPoint.y - TILE * 0.75;
+
+                ctx.drawImage(nozzleSprite, dx, dy, TILE, TILE);
+
+                while (segments > 0) {
+                    dy -= TILE;
+                    ctx.drawImage(lineSprite, dx, dy, TILE, TILE);
+                    segments--;
+                }
+            }
+            return;
+        }
+
+        // --- UP (Player looking UP) ---
+        if (diffY > 0) {
+            let segments = Math.abs(diffY) - 1;
+
+            // Logic: UP always uses drawFlippedSprite
+            const dx = px + halfTile;
+            let dy = endPoint.y + TILE * 0.25;
+
+            this.drawFlippedSprite(dx, dy, flipH, flipV, nozzleSprite);
+
+            while (segments > 0) {
+                dy += TILE;
+                this.drawFlippedSprite(dx, dy, flipH, flipV, lineSprite);
+                segments--;
+            }
+            return;
+        }
+
+        // --- RIGHT (Player looking RIGHT) ---
+        if (diffX < 0) {
+            let segments = Math.abs(diffX) - 1;
+
+            // Logic: RIGHT always uses drawFlippedSprite
+            let dx = endPoint.x - TILE * 0.25;
+            const dy = py + halfTile;
+
+            this.drawFlippedSprite(dx, dy, flipH, flipV, nozzleSprite);
+
+            while (segments > 0) {
+                dx -= TILE;
+                this.drawFlippedSprite(dx, dy, flipH, flipV, lineSprite);
+                segments--;
+            }
+            return;
+        }
+
+        // --- LEFT (Player looking LEFT) ---
+        if (diffX > 0) {
+            let segments = Math.abs(diffX) - 1;
+
+            // Logic: LEFT always uses standard drawImage
+            let dx = endPoint.x - TILE * 0.25;
+
+            ctx.drawImage(nozzleSprite, dx, py, TILE, TILE);
+
+            while (segments > 0) {
+                dx += TILE;
+                ctx.drawImage(lineSprite, dx, py, TILE, TILE);
+                segments--;
+            }
+        }
     }
 
     /**
