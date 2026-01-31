@@ -447,14 +447,21 @@ export class Game {
                     }
                 });
 
-                // Check rock-player
+                // Check rock-player (skip if already smooshed)
                 if (
+                    !this.player.isSmooshed &&
                     this.collisionSystem.checkRockEntityCollision(
                         rock,
                         this.player
                     )
                 ) {
-                    this.playerHit('rock');
+                    // Smoosh player and attach to rock
+                    this.player.smoosh(rock);
+                    // Immediately sync position so player doesn't lag behind
+                    this.player.x = rock.x;
+                    this.player.y = rock.y;
+                    this.state = GAME_STATES.DYING;
+                    this.deathStartTime = Date.now();
                 }
             }
 
@@ -465,6 +472,12 @@ export class Game {
                     enemy.y = rock.y;
                 }
             });
+
+            // Update smooshed player attached to this rock - falls with it
+            if (this.player.isSmooshed && this.player.attachedToRock === rock) {
+                this.player.x = rock.x;
+                this.player.y = rock.y;
+            }
         });
 
         // Remove destroyed/crumbled rocks
@@ -668,6 +681,19 @@ export class Game {
      */
     updateDeath(deltaTime) {
         this.player.update(deltaTime, null, this.grid);
+
+        // If player is smooshed, continue updating rocks so the attached rock can finish falling
+        if (this.player.isSmooshed) {
+            this.rocks.forEach((rock) => {
+                rock.update(deltaTime, this.grid, null); // Pass null for player to skip trigger checks
+            });
+
+            // Sync player position with attached rock
+            if (this.player.attachedToRock) {
+                this.player.x = this.player.attachedToRock.x;
+                this.player.y = this.player.attachedToRock.y;
+            }
+        }
 
         if (this.player.deathTimer >= DEATH.ANIMATION_DURATION) {
             // Death animation complete

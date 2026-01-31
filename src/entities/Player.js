@@ -45,6 +45,12 @@ export class Player {
         this.deathTimer = 0;
         this.deathType = null; // 'enemy' or 'rock'
 
+        // Smooshed state (crushed by rock - falls with rock)
+        this.isSmooshed = false;
+        this.attachedToRock = null;
+        this.smooshedDelayTimer = 0;
+        this.SMOOSHED_DELAY = 400; // Delay before dying animation starts (matches rock crumble delay)
+
         // Respawn invincibility
         this.isInvincible = false;
         this.invincibilityTimer = 0;
@@ -65,11 +71,37 @@ export class Player {
     }
 
     /**
+     * Player gets smooshed (crushed by rock)
+     * Shows smooshed sprite and falls with rock
+     */
+    smoosh(rock) {
+        this.isSmooshed = true;
+        this.attachedToRock = rock;
+        this.startDeath('rock');
+    }
+
+    /**
      * Update player state
      */
     update(deltaTime, inputManager, grid) {
         // Update death animation
         if (this.isDying) {
+            // If smooshed and attached to a falling rock, don't advance death timer
+            if (
+                this.isSmooshed &&
+                this.attachedToRock &&
+                this.attachedToRock.isFalling
+            ) {
+                return; // Wait for rock to stop falling
+            }
+            // If smooshed, wait for delay before starting dying animation
+            if (
+                this.isSmooshed &&
+                this.smooshedDelayTimer < this.SMOOSHED_DELAY
+            ) {
+                this.smooshedDelayTimer += deltaTime;
+                return; // Wait for delay to complete
+            }
             this.deathTimer += deltaTime;
             return; // Don't process normal updates
         }
@@ -497,5 +529,9 @@ export class Player {
         this.pumpTarget = null;
         this.shouldAutoRetract = false;
         this.pumpUsed = false;
+        // Reset smooshed state
+        this.isSmooshed = false;
+        this.attachedToRock = null;
+        this.smooshedDelayTimer = 0;
     }
 }

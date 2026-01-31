@@ -64,6 +64,18 @@ export class Renderer {
             'player_pumping_horizontal_2.png',
             'player_pumping_vertical_1.png',
             'player_pumping_vertical_2.png',
+            'player_smooshed_horizontal.png',
+            'player_smooshed_vertical.png',
+            'player_dying_horizontal_1.png',
+            'player_dying_horizontal_2.png',
+            'player_dying_horizontal_3.png',
+            'player_dying_horizontal_4.png',
+            'player_dying_horizontal_5.png',
+            'player_dying_vertical_1.png',
+            'player_dying_vertical_2.png',
+            'player_dying_vertical_3.png',
+            'player_dying_vertical_4.png',
+            'player_dying_vertical_5.png',
             'hose_line_horizontal.png',
             'hose_line_vertical.png',
             'hose_nozzle_horizontal.png',
@@ -467,36 +479,69 @@ export class Renderer {
      * Draw player death animation
      */
     drawPlayerDeath(player) {
-        const progress = player.deathTimer / DEATH.ANIMATION_DURATION;
         const px = player.x;
         const py = player.y;
+        const orientation = this.getPlayerOrientation(player);
 
-        // Death type determines animation
-        if (player.deathType === 'rock') {
-            // Squish effect - vertical compression
-            this.ctx.save();
-            this.ctx.globalAlpha = 1 - progress;
-            this.ctx.fillStyle = '#3498db';
-            const squishHeight = TILE_SIZE * (1 - progress * 0.8);
-            this.ctx.fillRect(
-                px + 2,
-                py + TILE_SIZE - squishHeight,
-                TILE_SIZE - 4,
-                squishHeight
-            );
-            this.ctx.restore();
-        } else {
-            // Enemy hit - particle explosion
-            this.ctx.save();
-            this.ctx.globalAlpha = 1 - progress;
-            this.ctx.fillStyle = '#3498db';
-            const spread = progress * 8;
-            // 4 particles spreading outward
-            this.ctx.fillRect(px + 6 - spread, py + 6, 4, 4);
-            this.ctx.fillRect(px + 6 + spread, py + 6, 4, 4);
-            this.ctx.fillRect(px + 6, py + 6 - spread, 4, 4);
-            this.ctx.fillRect(px + 6, py + 6 + spread, 4, 4);
-            this.ctx.restore();
+        // If smooshed and still falling with rock OR waiting for delay, show smooshed sprite
+        if (
+            player.isSmooshed &&
+            (player.attachedToRock?.isFalling ||
+                player.smooshedDelayTimer < player.SMOOSHED_DELAY)
+        ) {
+            const spriteKey = `player_smooshed_${orientation}`;
+            if (this.spritesLoaded) {
+                const sprite = this.sprites[spriteKey];
+                if (sprite && sprite.complete) {
+                    if (player.spriteFlipH) {
+                        const centerX = px + TILE_SIZE / 2;
+                        const centerY = py + TILE_SIZE / 2;
+                        this.drawFlippedSprite(
+                            centerX,
+                            centerY,
+                            true,
+                            false,
+                            sprite
+                        );
+                    } else {
+                        this.ctx.drawImage(
+                            sprite,
+                            px,
+                            py,
+                            TILE_SIZE,
+                            TILE_SIZE
+                        );
+                    }
+                    return;
+                }
+            }
+        }
+
+        // Death animation
+        const progress = player.deathTimer / DEATH.ANIMATION_DURATION;
+        // Calculate frame number (1-5) based on progress
+        const frameNumber = Math.min(5, Math.floor(progress * 5) + 1);
+        const spriteKey = `player_dying_${orientation}_${frameNumber}`;
+
+        if (this.spritesLoaded) {
+            const sprite = this.sprites[spriteKey];
+            if (sprite && sprite.complete) {
+                // Apply horizontal flip if needed, but never vertical flip
+                if (player.spriteFlipH) {
+                    const centerX = px + TILE_SIZE / 2;
+                    const centerY = py + TILE_SIZE / 2;
+                    this.drawFlippedSprite(
+                        centerX,
+                        centerY,
+                        true,
+                        false,
+                        sprite
+                    );
+                } else {
+                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
+                }
+                return;
+            }
         }
     }
 

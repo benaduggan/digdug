@@ -166,7 +166,7 @@ export const LEVEL = {
 
 // Death settings
 export const DEATH = {
-    ANIMATION_DURATION: 1000, // 1 second death animation
+    ANIMATION_DURATION: 1500, // 1.5 second death animation
     RESPAWN_DELAY: 3000, // 3 seconds "Player 1 Ready" display
     INVINCIBILITY_TIME: 2000, // 2 seconds invincibility after respawn
 };
