@@ -91,6 +91,8 @@ export class Renderer {
             'fygar_smooshed.png',
             'rock_1.png',
             'rock_2.png',
+            'rock_crumbling_1.png',
+            'rock_crumbling_2.png',
             'flower_small.png',
         ];
 
@@ -850,15 +852,27 @@ export class Renderer {
     }
 
     /**
-     * Draw a rock (simple gray square with crumble animation)
+     * Draw a rock with shaking and crumbling animations
      */
     drawRock(rock) {
         const px = rock.x;
         const py = rock.y;
 
-        // Crumble animation - needs alpha so use save/restore
+        // Crumble animation - alternate between crumbling sprites
         if (rock.isCrumbling) {
             const progress = rock.crumbleTimer / rock.CRUMBLE_DURATION;
+            // First half: crumbling_1, second half: crumbling_2
+            const spriteKey =
+                progress < 0.5 ? 'rock_crumbling_1' : 'rock_crumbling_2';
+
+            if (this.spritesLoaded) {
+                const sprite = this.sprites[spriteKey];
+                if (sprite && sprite.complete) {
+                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
+                    return;
+                }
+            }
+            // Fallback: simple fading particles
             this.ctx.save();
             this.ctx.globalAlpha = 1 - progress;
             this.ctx.fillStyle = '#95a5a6';
@@ -870,21 +884,26 @@ export class Renderer {
             return;
         }
 
-        // Calculate shake offset (use rock's own timer instead of Date.now for consistency)
-        const shakeOffset = rock.isShaking
-            ? Math.sin(rock.shakeTimer / 50) * 2
-            : 0;
-        const drawX = px + shakeOffset;
+        // Calculate shake offset and determine sprite for shaking
+        let spriteKey = 'rock_1';
+
+        if (rock.isShaking) {
+            // Alternate between rock_1 and rock_2 every 100ms while shaking
+            spriteKey =
+                Math.floor(rock.shakeTimer / 200) % 2 === 0
+                    ? 'rock_1'
+                    : 'rock_2';
+        }
 
         if (this.spritesLoaded) {
-            const sprite = this.sprites['rock_1'];
+            const sprite = this.sprites[spriteKey];
             if (sprite && sprite.complete) {
-                this.ctx.drawImage(sprite, drawX, py, TILE_SIZE, TILE_SIZE);
+                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
             } else {
-                this.drawRockFallback(drawX, py);
+                this.drawRockFallback(px, py);
             }
         } else {
-            this.drawRockFallback(drawX, py);
+            this.drawRockFallback(px, py);
         }
     }
 

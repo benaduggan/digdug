@@ -16,12 +16,12 @@ export class Rock {
         // Crumbling state (when hits dirt without killing enemy)
         this.isCrumbling = false;
         this.crumbleTimer = 0;
-        this.CRUMBLE_DURATION = 300; // ms to show crumble animation
+        this.CRUMBLE_DURATION = 800; // ms to show crumble animation
 
         // Delay before crumble when crushing enemy
         this.waitingToCrumble = false;
         this.crumbleDelayTimer = 0;
-        this.CRUMBLE_DELAY = 500; // 500ms delay before crumble after crushing enemy
+        this.CRUMBLE_DELAY = 400; // ms delay before crumble after crushing enemy
 
         // Track if rock crushed any enemies
         this.crushedEnemy = false;
@@ -203,7 +203,7 @@ export class Rock {
             const hitBottom = this.gridY >= grid.height - 1;
 
             if (hasDirtBelow || hasRockBelow || hitBottom) {
-                this.stopFalling(hasDirtBelow);
+                this.stopFalling();
             }
         }
     }
@@ -211,22 +211,15 @@ export class Rock {
     /**
      * Stop falling - crumble after landing
      */
-    stopFalling(hitDirt) {
+    stopFalling() {
         this.isFalling = false;
 
         // Snap to grid
         this.y = this.gridY * TILE_SIZE;
 
         // Rock crumbles after falling
-        if (this.crushedEnemy) {
-            // Delay crumble by 500ms when crushing enemy
-            this.waitingToCrumble = true;
-            this.crumbleDelayTimer = 0;
-        } else if (hitDirt) {
-            // Immediate crumble when hitting dirt without crushing
-            this.isCrumbling = true;
-            this.crumbleTimer = 0;
-        }
+        this.waitingToCrumble = true;
+        this.crumbleDelayTimer = 0;
     }
 
     /**
