@@ -6,12 +6,15 @@ A faithful recreation of the classic 1982 Dig Dug arcade game using vanilla Java
 
 - ✅ Authentic arcade gameplay mechanics
 - ✅ Procedural level generation for infinite replayability
-- ✅ Classic enemies: Pooka and Fygar
-- ✅ Rock dropping mechanics
-- ✅ Pump attack system
-- ✅ Progressive difficulty
+- ✅ Classic enemies: Pooka and Fygar with full AI
+- ✅ Rock dropping mechanics with physics
+- ✅ Pump attack system with sprite animations
+- ✅ Fygar fire-breathing attacks
+- ✅ Enemy ghost mode (move through dirt)
+- ✅ Progressive difficulty scaling
 - ✅ High score tracking (localStorage)
-- ✅ Pixel-perfect rendering
+- ✅ Pixel-perfect sprite rendering (70+ sprites)
+- ✅ Animated intro sequence
 - ✅ Responsive controls
 
 ## Installation
@@ -54,8 +57,9 @@ game.start();
 ## Controls
 
 - **Arrow Keys** or **WASD**: Move Dig Dug
-- **Space Bar**: Pump attack (inflate enemies)
+- **Space Bar**: Pump attack (hold to extend, release to retract)
 - **ESC**: Pause/Resume game
+- **Space** (on menu/game over): Start game
 
 ## Gameplay
 
@@ -68,17 +72,18 @@ Defeat all enemies on each level by either:
 
 ### Enemies
 
-**Pooka** (Red with yellow goggles)
+**Pooka** (Red with goggles)
 
-- Can move through dirt (ghosting)
-- Worth 200 points base
-- Common enemy type
+- Can move through dirt (ghost mode after 5-10 seconds)
+- Worth 200 points base + distance bonus
+- Speed: 0.7 in tunnels, 0.5 when ghosting
 
 **Fygar** (Green dragon)
 
-- Can breathe horizontal fire
-- Faster and more dangerous
-- Worth 400 points base
+- Can breathe horizontal fire (3-tile range)
+- Ghost mode activates after 10 seconds
+- Worth 400 points base + distance bonus
+- Speed: 0.6 in tunnels, 0.4 when ghosting
 
 ### Scoring
 
@@ -126,26 +131,26 @@ npm run preview
 ```
 digdug/
 ├── src/
-│   ├── index.js              # Main entry point
-│   ├── Game.js               # Core game loop
-│   ├── Renderer.js           # Canvas rendering
+│   ├── index.js              # Main entry point & exports
+│   ├── Game.js               # Core game loop & state machine
+│   ├── Renderer.js           # Canvas rendering & sprite system
 │   ├── entities/             # Game entities
-│   │   ├── Player.js
-│   │   ├── Enemy.js
-│   │   ├── Pooka.js
-│   │   ├── Fygar.js
-│   │   └── Rock.js
+│   │   ├── Player.js         # Player movement, digging, pump attack
+│   │   ├── Enemy.js          # Base enemy AI & ghost mode
+│   │   ├── Pooka.js          # Red enemy subclass
+│   │   ├── Fygar.js          # Green dragon with fire breath
+│   │   └── Rock.js           # Physics-based falling rocks
 │   ├── systems/              # Game systems
-│   │   ├── InputManager.js
-│   │   ├── CollisionSystem.js
-│   │   ├── LevelManager.js
-│   │   └── ScoreManager.js
+│   │   ├── InputManager.js   # Keyboard input handling
+│   │   ├── CollisionSystem.js # AABB collision detection
+│   │   ├── LevelManager.js   # Procedural level generation
+│   │   └── ScoreManager.js   # Score, lives, high scores
 │   └── utils/                # Utilities
-│       ├── constants.js
-│       └── Grid.js
-├── examples/
-│   └── basic.html           # Usage example
-├── dist/                    # Built files
+│       ├── constants.js      # Game configuration
+│       ├── Grid.js           # Tile-based world grid
+│       └── loadImage.js      # Sprite loading utility
+├── sprites/                  # Sprite assets (70+ images)
+├── dist/                     # Built files
 └── package.json
 ```
 
