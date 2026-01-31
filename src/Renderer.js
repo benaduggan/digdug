@@ -7,6 +7,7 @@ import {
     DIRECTIONS,
     DEATH,
     ENEMY_TYPES,
+    DIRT_GRADIENT,
 } from './utils/constants.js';
 import { loadImage } from './utils/loadImage.js';
 
@@ -208,6 +209,44 @@ export class Renderer {
         this.ctx.drawImage(this.backgroundCanvas, 0, 0);
     }
 
+    getDirtColorHSL(ratio) {
+        // Clamp ratio between 0 and 1
+        const r = Math.max(0, Math.min(1, ratio));
+
+        // Find the two colors we are between (e.g., Light and Mid)
+        let lower = DIRT_GRADIENT[0];
+        let upper = DIRT_GRADIENT[DIRT_GRADIENT.length - 1];
+
+        for (let i = 0; i < DIRT_GRADIENT.length - 1; i++) {
+            if (r >= DIRT_GRADIENT[i].stop && r <= DIRT_GRADIENT[i + 1].stop) {
+                lower = DIRT_GRADIENT[i];
+                upper = DIRT_GRADIENT[i + 1];
+                break;
+            }
+        }
+
+        // Calculate how far we are between the two stops (0.0 to 1.0)
+        // e.g. if Stops are 0.33 and 0.66, and ratio is 0.5, mixPercent is ~0.5
+        const range = upper.stop - lower.stop;
+        const mixPercent = (r - lower.stop) / range;
+
+        // Linear Interpolation (Lerp) the H, S, and L values
+        // Note: If Range is 0 (end of array), avoid divide by zero
+        if (range === 0) return upper.color;
+
+        return {
+            h: Math.round(
+                lower.color.h + (upper.color.h - lower.color.h) * mixPercent
+            ),
+            s: Math.round(
+                lower.color.s + (upper.color.s - lower.color.s) * mixPercent
+            ),
+            l: Math.round(
+                lower.color.l + (upper.color.l - lower.color.l) * mixPercent
+            ),
+        };
+    }
+
     /**
      * Render the full background to the cache canvas
      * Called only when grid changes
@@ -238,26 +277,70 @@ export class Renderer {
                 }
 
                 if (tile === TILE_TYPES.DIRT || tile === TILE_TYPES.ROCK) {
-                    // Draw dirt with depth-based coloring (adjusted for sky rows)
                     const depthRatio = (y - 2) / (grid.height - 2);
-                    const color = this.getDirtColor(depthRatio);
-                    ctx.fillStyle = color;
+
+                    // 1. Get Calculated HSL
+                    const { h, s, l } = this.getDirtColorHSL(depthRatio);
+
+                    // 2. Draw Base
+                    ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
                     ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
-                    // Add deterministic texture pattern
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-                    if ((x + y) % 2 === 0) {
-                        ctx.fillRect(px + 2, py + 2, 2, 2);
-                        ctx.fillRect(px + 8, py + 10, 2, 2);
-                    } else {
-                        ctx.fillRect(px + 6, py + 4, 2, 2);
-                        ctx.fillRect(px + 12, py + 8, 2, 2);
+                    // 3. Boost Saturation for Specs
+                    // Shadow: Darker (-15%) and Richer (+20% Saturation)
+                    const shadowColor = `hsl(${h}, ${Math.min(100, s + 20)}%, ${Math.max(0, l - 15)}%)`;
+
+                    // Highlight: Brighter (+10%) and Richer (+10% Saturation)
+                    const lightColor = `hsl(${h}, ${Math.min(100, s + 10)}%, ${Math.min(100, l + 10)}%)`;
+
+                    // 4. Texture Loop (Spread out 4px grid)
+                    const STEP = 4;
+                    const SPEC_SIZE = 2; // 2x2 specs
+
+                    // --- PASS 1: Saturated Shadows ---
+                    ctx.fillStyle = shadowColor;
+                    for (let dy = 0; dy < TILE_SIZE; dy += STEP) {
+                        for (let dx = 0; dx < TILE_SIZE; dx += STEP) {
+                            const seedX = x * TILE_SIZE + dx;
+                            const seedY = y * TILE_SIZE + dy;
+                            const noise =
+                                Math.abs(
+                                    Math.sin(seedX * 12.989 + seedY * 78.233) *
+                                        43758.545
+                                ) % 1;
+
+                            if (noise < 0.15) {
+                                ctx.fillRect(
+                                    px + dx + 1,
+                                    py + dy + 1,
+                                    SPEC_SIZE,
+                                    SPEC_SIZE
+                                );
+                            }
+                        }
                     }
 
-                    // Add lighter highlights
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-                    if ((x + y) % 3 === 0) {
-                        ctx.fillRect(px + 1, py + 1, 1, 1);
+                    // --- PASS 2: Vibrant Highlights ---
+                    ctx.fillStyle = lightColor;
+                    for (let dy = 0; dy < TILE_SIZE; dy += STEP) {
+                        for (let dx = 0; dx < TILE_SIZE; dx += STEP) {
+                            const seedX = x * TILE_SIZE + dx;
+                            const seedY = y * TILE_SIZE + dy;
+                            const noise =
+                                Math.abs(
+                                    Math.sin(seedX * 90.123 + seedY * 11.456) *
+                                        12345.678
+                                ) % 1;
+
+                            if (noise < 0.08) {
+                                ctx.fillRect(
+                                    px + dx + 1,
+                                    py + dy + 1,
+                                    SPEC_SIZE,
+                                    SPEC_SIZE
+                                );
+                            }
+                        }
                     }
                 }
                 // Empty tiles are just the background color (already cleared)
