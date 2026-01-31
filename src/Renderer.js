@@ -7,8 +7,8 @@ import {
     DIRECTIONS,
     DEATH,
     ENEMY_TYPES,
-    GRID_WIDTH,
 } from './utils/constants.js';
+import { loadImage } from './utils/loadImage.js';
 
 export class Renderer {
     constructor(config) {
@@ -112,6 +112,40 @@ export class Renderer {
      */
     attachTo(container) {
         container.appendChild(this.canvas);
+    }
+
+    async drawMenu() {
+        const img = await loadImage('/assets/sprites/dig_dug_title.png');
+        const width = img.naturalWidth * 1.5;
+        this.ctx.drawImage(
+            img,
+            CANVAS_WIDTH / 2 - width / 2,
+            TILE_SIZE * 2,
+            width,
+            img.naturalHeight * 1.5
+        );
+
+        this.drawText(
+            '▶ 1 PLAYER',
+            CANVAS_WIDTH / 2,
+            CANVAS_HEIGHT / 2 + TILE_SIZE * 6,
+            {
+                size: 8,
+                color: COLORS.TEXT_WHITE,
+                align: 'center',
+            }
+        );
+
+        // this.drawText(
+        //     'ARROWS -> MOVE // SPACE -> PUMP // ESC -> PAUSE',
+        //     CANVAS_WIDTH / 2,
+        //     CANVAS_HEIGHT / 2 + TILE_SIZE * 8,
+        //     {
+        //         size: 5,
+        //         color: COLORS.TEXT_WHITE,
+        //         align: 'center',
+        //     }
+        // );
     }
 
     /**
@@ -697,7 +731,7 @@ export class Renderer {
         }
 
         // Hi-score (center)
-        this.drawText('HI SCORE', CANVAS_WIDTH / 2, 10, {
+        this.drawText('HI-SCORE', CANVAS_WIDTH / 2, 10, {
             size: 6,
             color: COLORS.TEXT_RED,
             align: 'center',

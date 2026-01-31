@@ -71,56 +71,7 @@ export class Game {
     showMenu() {
         this.state = GAME_STATES.MENU;
         this.renderer.clear();
-        this.renderer.drawText(
-            'DIG DUG',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - 60,
-            {
-                size: 16,
-                color: COLORS.TEXT_RED,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText(
-            'PRESS SPACE',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 10,
-            {
-                size: 8,
-                color: COLORS.TEXT_WHITE,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText(
-            'TO START',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 30,
-            {
-                size: 8,
-                color: COLORS.TEXT_WHITE,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText(
-            'ARROWS MOVE',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 60,
-            {
-                size: 6,
-                color: COLORS.TEXT_WHITE,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText(
-            'SPACE PUMP',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 75,
-            {
-                size: 6,
-                color: COLORS.TEXT_WHITE,
-                align: 'center',
-            }
-        );
+        this.renderer.drawMenu();
 
         // Wait for space key (only set up listener once)
         if (!this.menuListenerAdded) {

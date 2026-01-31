@@ -1,5 +1,5 @@
-import { Game } from './Game.js';
 import './styles.css';
+import { Game } from './Game.js';
 
 // Export the Game class as the default export for npm package
 export default Game;
@@ -15,7 +15,7 @@ if (typeof window !== 'undefined') {
         // Development mode - auto-start the game
         const game = new Game({
             container: gameContainer,
-            scale: 2,
+            scale: window.devicePixelRatio,
             debug: false,
             onGameOver: (score) => {
                 // console.log('Game Over! Final Score:', score);
