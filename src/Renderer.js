@@ -57,6 +57,16 @@ export class Renderer {
             'player_digging_horizontal_2.png',
             'player_digging_vertical_1.png',
             'player_digging_vertical_2.png',
+            'player_shooting_horizontal.png',
+            'player_shooting_vertical.png',
+            'player_pumping_horizontal_1.png',
+            'player_pumping_horizontal_2.png',
+            'player_pumping_vertical_1.png',
+            'player_pumping_vertical_2.png',
+            'hose_horizontal_1.png',
+            'hose_horizontal_2.png',
+            'hose_vertical_1.png',
+            'hose_vertical_2.png',
             'pooka_walking_1.png',
             'pooka_walking_2.png',
             'pooka_ghosting_1.png',
@@ -288,17 +298,25 @@ export class Renderer {
         // Use sprites if loaded, otherwise fallback to simple square
         if (this.spritesLoaded) {
             // Determine which sprite set to use (horizontal or vertical, walking or digging)
-            const spriteAction = player.isDigging ? 'digging' : 'walking';
-            const frameNumber = player.animationFrame === 0 ? '1' : '2';
+            let spriteAction = 'walking';
+            if (player.isDigging) spriteAction = 'digging';
+            else if (player.isPumping) spriteAction = 'pumping';
+
+            let frameNumber = player.animationFrame === 0 ? '_1' : '_2';
             const orientation =
                 player.direction === DIRECTIONS.LEFT ||
                 player.direction === DIRECTIONS.RIGHT
                     ? 'horizontal'
                     : 'vertical';
 
+            if (player.isShooting) {
+                spriteAction = 'shooting';
+                frameNumber = '';
+            }
+
             const sprite =
                 this.sprites[
-                    `player_${spriteAction}_${orientation}_${frameNumber}`
+                    `player_${spriteAction}_${orientation}${frameNumber}`
                 ];
 
             if (sprite && sprite.complete) {

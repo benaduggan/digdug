@@ -116,7 +116,9 @@ export class Game {
         this.levelManager.generateLevel(1);
 
         // Create enemies (spawned in tunnels, but frozen during intro)
-        this.enemies = this.levelManager.spawnEnemies(1);
+        this.enemies = this.config.debug
+            ? []
+            : this.levelManager.spawnEnemies(1);
 
         // Create rocks AFTER enemies
         this.levelManager.placeRocksAfterEnemies(1, this.enemies);
@@ -385,7 +387,7 @@ export class Game {
         this.checkCollisions();
 
         // Check level complete
-        if (this.enemies.length === 0) {
+        if (!this.config.debug && this.enemies.length === 0) {
             this.levelComplete();
         }
     }

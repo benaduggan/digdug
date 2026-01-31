@@ -17,6 +17,7 @@ export class Player {
         this.isMoving = false;
 
         // Pump attack
+        this.isShooting = false;
         this.isPumping = false;
         this.pumpTarget = null;
         this.pumpLength = 0; // Current length of pump line in pixels
@@ -101,18 +102,18 @@ export class Player {
             !this.shouldAutoRetract &&
             !this.pumpUsed
         ) {
-            if (!this.isPumping) {
+            if (!this.isShooting) {
                 this.startPump();
             }
             this.extendPump(deltaTime);
-        } else if (this.isPumping || this.pumpLength > 0) {
+        } else if (this.isShooting || this.pumpLength > 0) {
             this.retractPump();
         }
 
         // Get input direction - but don't move or rotate while pumping
         const inputDirection = inputManager.getDirection();
 
-        if (inputDirection && !this.isPumping) {
+        if (inputDirection && !this.isShooting && !this.isPumping) {
             // Track previous direction before changing
             if (inputDirection !== this.direction) {
                 this.previousDirection = this.direction;
@@ -337,7 +338,7 @@ export class Player {
      * Start pumping attack
      */
     startPump() {
-        this.isPumping = true;
+        this.isShooting = true;
         this.isMoving = false; // Can't move while pumping
     }
 
@@ -347,6 +348,8 @@ export class Player {
     extendPump(deltaTime) {
         // Stop extending if we've hit an enemy (pumpTarget is set)
         if (this.pumpTarget) {
+            this.isShooting = false;
+            this.isPumping = true;
             // If the target was destroyed (popped), immediately clear the pump
             if (this.pumpTarget.isDestroyed) {
                 this.pumpLength = 0;
@@ -416,6 +419,8 @@ export class Player {
      * Retract pump line when Space is released
      */
     retractPump() {
+        this.isShooting = false;
+
         // If the target was destroyed (popped), immediately clear the pump
         if (this.pumpTarget && this.pumpTarget.isDestroyed) {
             this.pumpLength = 0;
@@ -488,6 +493,7 @@ export class Player {
         this.animationTimer = 0;
         this.fullLengthTimer = 0;
         this.pumpLength = 0;
+        this.isShooting = false;
         this.isPumping = false;
         this.pumpTarget = null;
         this.shouldAutoRetract = false;
