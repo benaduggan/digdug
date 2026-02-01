@@ -496,15 +496,7 @@ export class Renderer {
                     // No flip needed - draw directly without save/restore
                     this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
                 }
-            } else {
-                // Fallback to simple blue square
-                this.ctx.fillStyle = '#3498db';
-                this.ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
             }
-        } else {
-            // Fallback to simple blue square while sprites are loading
-            this.ctx.fillStyle = '#3498db';
-            this.ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
     }
 
@@ -912,39 +904,7 @@ export class Renderer {
             );
 
             this.ctx.restore();
-        } else {
-            // Fallback to colored rectangles if sprite not loaded
-            for (let i = 0; i < tileCount; i++) {
-                this.drawFygarFireFallback(enemy, i, facingLeft);
-            }
         }
-    }
-
-    /**
-     * Fallback fire rendering if sprites not loaded
-     */
-    drawFygarFireFallback(enemy, segmentIndex, facingLeft) {
-        const centerY = enemy.y + TILE_SIZE / 2;
-
-        // Color gradient from yellow to red
-        const colors = ['#ffff00', '#ff8800', '#ff3300'];
-        this.ctx.fillStyle = colors[segmentIndex];
-
-        let fireX;
-        if (facingLeft) {
-            fireX = enemy.x - (segmentIndex + 1) * TILE_SIZE;
-        } else {
-            fireX = enemy.x + TILE_SIZE + segmentIndex * TILE_SIZE;
-        }
-
-        // Draw flame rectangle
-        const flameHeight = TILE_SIZE * 0.6;
-        this.ctx.fillRect(
-            fireX + 2,
-            centerY - flameHeight / 2,
-            TILE_SIZE - 4,
-            flameHeight
-        );
     }
 
     /**
@@ -975,11 +935,7 @@ export class Renderer {
                 const sprite = this.sprites['rock_1'];
                 if (sprite && sprite.complete) {
                     this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-                } else {
-                    this.drawRockFallback(px, py);
                 }
-            } else {
-                this.drawRockFallback(px, py);
             }
 
             this.ctx.restore();
@@ -1000,16 +956,6 @@ export class Renderer {
                     return;
                 }
             }
-            // Fallback: simple fading particles
-            this.ctx.save();
-            this.ctx.globalAlpha = 1 - progress;
-            this.ctx.fillStyle = '#95a5a6';
-            const offset = progress * 4;
-            this.ctx.fillRect(px + 2 - offset, py + 3, 4, 4);
-            this.ctx.fillRect(px + 10 + offset, py + 3, 4, 4);
-            this.ctx.fillRect(px + 6, py + 8 + offset, 4, 4);
-            this.ctx.restore();
-            return;
         }
 
         // Calculate shake offset and determine sprite for shaking
@@ -1027,18 +973,8 @@ export class Renderer {
             const sprite = this.sprites[spriteKey];
             if (sprite && sprite.complete) {
                 this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-            } else {
-                this.drawRockFallback(px, py);
             }
-        } else {
-            this.drawRockFallback(px, py);
         }
-    }
-
-    drawRockFallback(px, py) {
-        // Simple gray square for rock
-        this.ctx.fillStyle = '#95a5a6';
-        this.ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
     }
 
     /**
