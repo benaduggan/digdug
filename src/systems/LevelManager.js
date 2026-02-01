@@ -429,24 +429,83 @@ export class LevelManager {
 
     /**
      * Spawn bonus item in center of screen
+     * @param {number} bonusIndex - Sequential index for determining which prize to show (0, 1, 2, ...)
      */
-    spawnBonusItem() {
+    spawnBonusItem(bonusIndex = 0) {
         const centerX = Math.floor(GRID_WIDTH / 2) * TILE_SIZE;
         const centerY = Math.floor(GRID_HEIGHT / 2) * TILE_SIZE;
 
         return {
             x: centerX,
             y: centerY,
-            lifetime: 5000, // 5 seconds
-            spawnTime: Date.now(),
+            bonusIndex: bonusIndex, // Store the index for sequential prize selection
+            FLASH_START: 3000, // Start flashing after 3 seconds
+            FLASH_DURATION: 2000, // Flash for 2 seconds then disappear
+            elapsedTime: 0,
             update: function (deltaTime) {
-                // Check if expired
-                if (Date.now() - this.spawnTime > this.lifetime) {
+                this.elapsedTime += deltaTime;
+                // Check if expired (3s visible + 2s flashing = 5s total)
+                if (this.elapsedTime > this.FLASH_START + this.FLASH_DURATION) {
                     return false; // Mark for removal
                 }
                 return true;
             },
+            isFlashing: function () {
+                return this.elapsedTime >= this.FLASH_START;
+            },
         };
+    }
+
+    /**
+     * Spawn a single rock in a dirt tile
+     * @returns {Rock|null} The spawned rock, or null if no valid position found
+     */
+    spawnSingleRock() {
+        // Find all dirt tiles that are valid for rock placement
+        const validPositions = [];
+
+        for (let y = 4; y < GRID_HEIGHT - 2; y++) {
+            for (let x = 2; x < GRID_WIDTH - 2; x++) {
+                // Must be dirt
+                if (!this.grid.isDirt(x, y)) continue;
+
+                // Avoid center columns (where player starts)
+                if (x >= GRID_WIDTH / 2 - 2 && x <= GRID_WIDTH / 2 + 2)
+                    continue;
+
+                // Check distance from existing rocks
+                let tooCloseToRock = false;
+                for (const rock of this.rocks) {
+                    const rockGridX = Math.floor(rock.x / TILE_SIZE);
+                    const rockGridY = Math.floor(rock.y / TILE_SIZE);
+                    const dist =
+                        Math.abs(x - rockGridX) + Math.abs(y - rockGridY);
+                    if (dist < 4) {
+                        tooCloseToRock = true;
+                        break;
+                    }
+                }
+                if (tooCloseToRock) continue;
+
+                validPositions.push({ x, y });
+            }
+        }
+
+        if (validPositions.length === 0) {
+            return null; // No valid position found
+        }
+
+        // Pick a random valid position
+        const pos =
+            validPositions[Math.floor(Math.random() * validPositions.length)];
+
+        // Place rock in grid
+        this.grid.placeRock(pos.x, pos.y);
+
+        // Create Rock entity (don't add to this.rocks - Game.js manages that)
+        const rock = new Rock(pos.x * TILE_SIZE, pos.y * TILE_SIZE, this.grid);
+
+        return rock;
     }
 
     /**

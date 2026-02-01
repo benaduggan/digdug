@@ -106,6 +106,17 @@ export class Renderer {
             'rock_crumbling_1.png',
             'rock_crumbling_2.png',
             'flower_small.png',
+            'prize_1.png',
+            'prize_2.png',
+            'prize_3.png',
+            'prize_4.png',
+            'prize_5.png',
+            'prize_6.png',
+            'prize_7.png',
+            'prize_8.png',
+            'prize_9.png',
+            'prize_10.png',
+            'prize_11.png',
         ];
 
         let loadedCount = 0;
@@ -903,6 +914,38 @@ export class Renderer {
         const px = rock.x;
         const py = rock.y;
 
+        // Spawn animation - fade in with flash effect
+        if (rock.isSpawning) {
+            const progress = rock.spawnTimer / rock.SPAWN_DURATION;
+            // Fade in from 0 to 1 over the duration
+            const baseAlpha = progress;
+            // Flash effect - oscillate rapidly, faster as we progress
+            const flashFrequency = 8 + progress * 12; // 8-20 Hz flash
+            const flashPhase = Math.sin(
+                rock.spawnTimer * flashFrequency * 0.01
+            );
+            // Flash intensity decreases as spawn completes
+            const flashIntensity = (1 - progress) * 0.4;
+            const alpha = Math.min(1, baseAlpha + flashPhase * flashIntensity);
+
+            this.ctx.save();
+            this.ctx.globalAlpha = Math.max(0, alpha);
+
+            if (this.spritesLoaded) {
+                const sprite = this.sprites['rock_1'];
+                if (sprite && sprite.complete) {
+                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
+                } else {
+                    this.drawRockFallback(px, py);
+                }
+            } else {
+                this.drawRockFallback(px, py);
+            }
+
+            this.ctx.restore();
+            return;
+        }
+
         // Crumble animation - alternate between crumbling sprites
         if (rock.isCrumbling) {
             const progress = rock.crumbleTimer / rock.CRUMBLE_DURATION;
@@ -959,31 +1002,41 @@ export class Renderer {
     }
 
     /**
-     * Draw bonus item
+     * Draw bonus item with level-based prize sprites
+     * Prizes unlock every 20 levels, spawning in order (0, 1, 2 within available range)
+     * Item flashes after 3 seconds and disappears after 5 seconds total
      */
-    drawBonusItem(item) {
+    drawBonusItem(item, level = 1) {
         const px = item.x;
         const py = item.y;
 
-        // Draw simple bonus item (yellow circle/fruit)
-        this.ctx.fillStyle = COLORS.TEXT_RED;
-        this.ctx.beginPath();
-        this.ctx.arc(
-            px + TILE_SIZE / 2,
-            py + TILE_SIZE / 2,
-            TILE_SIZE / 3,
-            0,
-            Math.PI * 2
-        );
-        this.ctx.fill();
+        // If flashing, toggle visibility every 100ms
+        if (item.isFlashing && item.isFlashing()) {
+            const flashVisible = Math.floor(item.elapsedTime / 100) % 2 === 0;
+            if (!flashVisible) return; // Skip rendering on flash-off frames
+        }
 
-        // Pulsing effect
-        const scale = 1 + Math.sin(Date.now() / 200) * 0.1;
-        this.ctx.save();
-        this.ctx.translate(px + TILE_SIZE / 2, py + TILE_SIZE / 2);
-        this.ctx.scale(scale, scale);
-        this.ctx.translate(-(px + TILE_SIZE / 2), -(py + TILE_SIZE / 2));
-        this.ctx.restore();
+        // 1. Calculate the "Starting Prize" for this level range.
+        // At level 1, start at 0. At level 160, start at 8 (Prize 9).
+        // We use Math.min to ensure we don't exceed the index for Prize 9.
+        const floorIndex = Math.min(Math.floor((level - 1) / 20), 8);
+
+        // 2. Use sequential bonusIndex (cycles through 0, 1, 2) instead of random
+        const localIndex = (item.bonusIndex || 0) % 3;
+
+        // 3. Final Prize Number
+        // This ensures prizes spawn in order within the available range
+        const prizeNumber = Math.min(floorIndex + localIndex + 1, 11);
+
+        const spriteKey = `prize_${prizeNumber}`;
+
+        if (this.spritesLoaded) {
+            const sprite = this.sprites[spriteKey];
+
+            if (sprite && sprite.complete) {
+                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
+            }
+        }
     }
 
     /**

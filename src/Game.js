@@ -47,6 +47,14 @@ export class Game {
         this.rocks = [];
         this.bonusItems = [];
 
+        // Rock respawn timer
+        this.rockRespawnTimer = 0;
+        this.ROCK_RESPAWN_DELAY = 5000; // 5 seconds before spawning a new rock
+        this.needsRockRespawn = false;
+
+        // Bonus spawn tracking
+        this.bonusSpawnCount = 0; // Sequential counter for prize order
+
         // Bind methods
         this.gameLoop = this.gameLoop.bind(this);
     }
@@ -127,8 +135,13 @@ export class Game {
         // Clear bonus items
         this.bonusItems = [];
 
-        // Reset dropped rocks counter
+        // Reset dropped rocks counter and bonus spawn count
         this.droppedRocksCount = 0;
+        this.bonusSpawnCount = 0;
+
+        // Reset rock respawn timer
+        this.rockRespawnTimer = 0;
+        this.needsRockRespawn = false;
 
         // Calculate target positions for player
         this.introCenterX = Math.floor(this.grid.width / 2); // Center column
@@ -185,8 +198,12 @@ export class Game {
         // Clear bonus items
         this.bonusItems = [];
 
-        // Reset dropped rocks counter
+        // Reset dropped rocks counter (but NOT bonusSpawnCount - that persists across levels)
         this.droppedRocksCount = 0;
+
+        // Reset rock respawn timer
+        this.rockRespawnTimer = 0;
+        this.needsRockRespawn = false;
     }
 
     /**
@@ -378,6 +395,26 @@ export class Game {
             rock.update(deltaTime, this.grid, this.player);
         });
 
+        // Update rock respawn timer if no rocks remain
+        if (this.needsRockRespawn && this.rocks.length === 0) {
+            this.rockRespawnTimer += deltaTime;
+            if (this.rockRespawnTimer >= this.ROCK_RESPAWN_DELAY) {
+                // Try to spawn a new rock in dirt
+                const newRock = this.levelManager.spawnSingleRock();
+                if (newRock) {
+                    // Start spawn animation for fade-in/flash effect
+                    newRock.startSpawnAnimation();
+                    // Add rock to Game's rocks array
+                    this.rocks.push(newRock);
+                    this.needsRockRespawn = false;
+                    this.rockRespawnTimer = 0;
+                } else {
+                    // No valid dirt position found, stop trying
+                    this.needsRockRespawn = false;
+                }
+            }
+        }
+
         // Update bonus items
         this.bonusItems.forEach((item) => {
             item.update(deltaTime);
@@ -481,7 +518,14 @@ export class Game {
         });
 
         // Remove destroyed/crumbled rocks
+        const rocksBeforeFilter = this.rocks.length;
         this.rocks = this.rocks.filter((rock) => !rock.isDestroyed);
+
+        // Check if all rocks are gone and start respawn timer
+        if (this.rocks.length === 0 && rocksBeforeFilter > 0) {
+            this.needsRockRespawn = true;
+            this.rockRespawnTimer = 0;
+        }
 
         // Remove escaped enemies
         this.enemies = this.enemies.filter((enemy) => !enemy.hasEscaped);
@@ -657,9 +701,12 @@ export class Game {
     checkBonusSpawn() {
         // Spawn bonus after 2 rocks dropped
         if (this.droppedRocksCount === 2 && this.bonusItems.length === 0) {
-            const bonusItem = this.levelManager.spawnBonusItem();
+            const bonusItem = this.levelManager.spawnBonusItem(
+                this.bonusSpawnCount
+            );
             if (bonusItem) {
                 this.bonusItems.push(bonusItem);
+                this.bonusSpawnCount++; // Increment for next spawn to get next prize in sequence
             }
         }
     }
@@ -811,7 +858,7 @@ export class Game {
 
         // Draw bonus items
         this.bonusItems.forEach((item) => {
-            this.renderer.drawBonusItem(item);
+            this.renderer.drawBonusItem(item, this.levelManager.currentLevel);
         });
 
         // Draw player

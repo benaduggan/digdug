@@ -38,12 +38,26 @@ export class Rock {
         // Grid position
         this.gridX = Math.floor(x / TILE_SIZE);
         this.gridY = Math.floor(y / TILE_SIZE);
+
+        // Spawn animation state (for respawned rocks)
+        this.isSpawning = false;
+        this.spawnTimer = 0;
+        this.SPAWN_DURATION = 2000; // 2 seconds fade-in with flash
     }
 
     /**
      * Update rock state
      */
     update(deltaTime, grid, player) {
+        // Update spawn animation
+        if (this.isSpawning) {
+            this.spawnTimer += deltaTime;
+            if (this.spawnTimer >= this.SPAWN_DURATION) {
+                this.isSpawning = false;
+            }
+            return; // Don't process anything else while spawning
+        }
+
         // Update crumble delay (after crushing enemy)
         if (this.waitingToCrumble) {
             this.crumbleDelayTimer += deltaTime;
@@ -164,6 +178,14 @@ export class Rock {
         const verticalClear = playerGridY !== this.gridY + 1;
 
         return horizontalClear || verticalClear;
+    }
+
+    /**
+     * Start spawn animation (for respawned rocks)
+     */
+    startSpawnAnimation() {
+        this.isSpawning = true;
+        this.spawnTimer = 0;
     }
 
     /**
