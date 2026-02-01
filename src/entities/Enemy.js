@@ -20,8 +20,10 @@ export class Enemy {
         this.level = level;
 
         // Speed (increases with level)
-        this.baseSpeed = speed;
-        this.speed = speed + (level - 1) * 0.1;
+        // The base speed increases by 0.2 every time you hit a multiple of 5 (Lvl 5, 10, 15...)
+        const speedTier = Math.floor(level / 5);
+        const TIER_INCREMENT = 0.2;
+        this.speed = speed + speedTier * TIER_INCREMENT;
 
         // Movement state
         this.direction = DIRECTIONS.DOWN;
