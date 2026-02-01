@@ -55,6 +55,12 @@ export class Game {
         // Bonus spawn tracking
         this.bonusSpawnCount = 0; // Sequential counter for prize order
 
+        // Floating score display
+        this.floatingScores = [];
+
+        // Track dirt count for dig scoring
+        this.lastDirtCount = 0;
+
         // Bind methods
         this.gameLoop = this.gameLoop.bind(this);
     }
@@ -204,6 +210,8 @@ export class Game {
         // Reset rock respawn timer
         this.rockRespawnTimer = 0;
         this.needsRockRespawn = false;
+
+        this.floatingScores = [];
     }
 
     /**
@@ -375,9 +383,20 @@ export class Game {
             return;
         }
 
-        // Update player
+        // Update player and track digging for scoring
         if (this.player) {
+            const dirtBefore = this.countDirtTiles();
             this.player.update(deltaTime, this.inputManager, this.grid);
+            const dirtAfter = this.countDirtTiles();
+
+            // Award points for each tile dug
+            const tilesDigged = dirtBefore - dirtAfter;
+            for (let i = 0; i < tilesDigged; i++) {
+                this.scoreManager.addDigScore();
+            }
+            if (tilesDigged > 0) {
+                this.config.onScoreChange(this.scoreManager.score);
+            }
         }
 
         // Mark last enemy
@@ -419,6 +438,9 @@ export class Game {
         this.bonusItems.forEach((item) => {
             item.update(deltaTime);
         });
+
+        // Update floating scores
+        this.updateFloatingScores(deltaTime);
 
         // Check collisions
         this.checkCollisions();
@@ -470,8 +492,8 @@ export class Game {
                         )
                     ) {
                         rock.markEnemyCrushed(); // Mark rock as having crushed an enemy
-                        this.scoreManager.addRockKill(enemy.type);
-                        this.config.onScoreChange(this.scoreManager.score);
+                        // Track this kill for multi-kill scoring (scored when rock finishes)
+                        rock.incrementKillCount(enemy.x, enemy.y);
                         this.droppedRocksCount++;
                         this.checkBonusSpawn();
 
@@ -517,9 +539,23 @@ export class Game {
             }
         });
 
-        // Remove destroyed/crumbled rocks
+        // Remove destroyed/crumbled rocks and score multi-kills
         const rocksBeforeFilter = this.rocks.length;
-        this.rocks = this.rocks.filter((rock) => !rock.isDestroyed);
+        this.rocks = this.rocks.filter((rock) => {
+            if (rock.isDestroyed) {
+                // Score rock kills based on total enemies killed by this rock
+                if (rock.enemiesKilled > 0) {
+                    const points = this.scoreManager.addRockKill(
+                        rock.enemiesKilled
+                    );
+                    this.config.onScoreChange(this.scoreManager.score);
+                    // Show floating score at rock's final position (where it crumbled)
+                    this.spawnFloatingScore(points, rock.x, rock.y);
+                }
+                return false;
+            }
+            return true;
+        });
 
         // Check if all rocks are gone and start respawn timer
         if (this.rocks.length === 0 && rocksBeforeFilter > 0) {
@@ -533,13 +569,20 @@ export class Game {
         // Remove destroyed enemies (popped from inflation or smooshed by rock)
         this.enemies = this.enemies.filter((enemy) => {
             if (enemy.isDestroyed) {
-                // Only award points for pumped enemies (not smooshed - those were scored when rock hit)
+                // Only award points for pumped enemies (not smooshed - those are scored when rock finishes)
                 if (!enemy.isSmooshed) {
-                    this.scoreManager.addEnemyKill(
+                    // Determine if this was a horizontal kill (pump direction from player)
+                    const isHorizontalKill =
+                        this.player.direction === DIRECTIONS.LEFT ||
+                        this.player.direction === DIRECTIONS.RIGHT;
+                    const points = this.scoreManager.addEnemyKill(
                         enemy.type,
-                        enemy.distanceFromPlayer
+                        enemy.y,
+                        isHorizontalKill
                     );
                     this.config.onScoreChange(this.scoreManager.score);
+                    // Show floating score at enemy position
+                    this.spawnFloatingScore(points, enemy.x, enemy.y);
                 }
                 return false;
             }
@@ -554,8 +597,10 @@ export class Game {
                     item
                 )
             ) {
-                const points = this.scoreManager.addBonusItem();
+                const points = this.scoreManager.addBonusItem(item.bonusIndex);
                 this.config.onScoreChange(this.scoreManager.score);
+                // Show floating score at item position
+                this.spawnFloatingScore(points, item.x, item.y);
                 return false;
             }
             return true;
@@ -709,6 +754,36 @@ export class Game {
                 this.bonusSpawnCount++; // Increment for next spawn to get next prize in sequence
             }
         }
+    }
+
+    /**
+     * Spawn a floating score display at the given position
+     */
+    spawnFloatingScore(points, x, y) {
+        this.floatingScores.push({
+            points,
+            x,
+            y,
+            timer: 0,
+            duration: 1000, // 1 second display
+        });
+    }
+
+    /**
+     * Update floating scores
+     */
+    updateFloatingScores(deltaTime) {
+        this.floatingScores = this.floatingScores.filter((score) => {
+            score.timer += deltaTime;
+            return score.timer < score.duration;
+        });
+    }
+
+    /**
+     * Count dirt tiles in the grid
+     */
+    countDirtTiles() {
+        return this.grid.countDirt();
     }
 
     /**
@@ -870,6 +945,9 @@ export class Game {
         this.enemies.forEach((enemy) => {
             this.renderer.drawEnemy(enemy);
         });
+
+        // Draw floating scores
+        this.renderer.drawFloatingScores(this.floatingScores);
 
         // Draw UI
         this.renderer.drawUI(this.scoreManager, this.levelManager);

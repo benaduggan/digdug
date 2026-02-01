@@ -35,6 +35,37 @@ export class Renderer {
         this.spritesLoaded = false;
         this.loadSprites();
 
+        // Score sprite sheet (separate from regular sprites)
+        this.scoreSheet = null;
+        this.scoreSheetLoaded = false;
+        this.loadScoreSheet();
+
+        // Score sprite coordinates mapping
+        // Based on score_sheet.png layout:
+        // Row 0: ~, 200, 300, 400, 500, 600, 800, 1000
+        // Row 1: 1000, 2000, 2500, 3000, 4000, 5000, 6000
+        // Row 2: 7000, 8000, 10000, 12000, 15000
+        this.scoreSpriteMap = {
+            200: { x: 23, y: 0, w: 15, h: 7 },
+            300: { x: 42, y: 0, w: 15, h: 7 },
+            400: { x: 61, y: 0, w: 15, h: 7 },
+            500: { x: 81, y: 0, w: 15, h: 7 },
+            600: { x: 100, y: 0, w: 15, h: 7 },
+            800: { x: 119, y: 0, w: 15, h: 7 },
+            1000: { x: 0, y: 15, w: 17, h: 7 },
+            2000: { x: 21, y: 15, w: 20, h: 7 },
+            2500: { x: 45, y: 15, w: 20, h: 7 },
+            3000: { x: 69, y: 15, w: 20, h: 7 },
+            4000: { x: 93, y: 15, w: 20, h: 7 },
+            5000: { x: 117, y: 15, w: 20, h: 7 },
+            6000: { x: 141, y: 15, w: 20, h: 7 },
+            7000: { x: 13, y: 30, w: 20, h: 7 },
+            8000: { x: 40, y: 30, w: 20, h: 7 },
+            10000: { x: 66, y: 30, w: 22, h: 7 },
+            12000: { x: 95, y: 30, w: 22, h: 7 },
+            15000: { x: 124, y: 30, w: 22, h: 7 },
+        };
+
         // Background cache - pre-rendered dirt layer for performance
         this.backgroundCanvas = document.createElement('canvas');
         this.backgroundCanvas.width = config.width;
@@ -141,6 +172,15 @@ export class Renderer {
             img.src = `/assets/sprites/${filename}`;
             this.sprites[spriteName] = img;
         });
+    }
+
+    /**
+     * Load the score sprite sheet
+     */
+    async loadScoreSheet() {
+        const img = await loadImage('/assets/sprites/score_sheet.png');
+        this.scoreSheet = img;
+        this.scoreSheetLoaded = true;
     }
 
     /**
@@ -1037,6 +1077,34 @@ export class Renderer {
                 this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
             }
         }
+    }
+
+    /**
+     * Draw floating score displays
+     */
+    drawFloatingScores(floatingScores) {
+        if (!this.scoreSheetLoaded || !this.scoreSheet) return;
+
+        floatingScores.forEach((score) => {
+            const spriteInfo = this.scoreSpriteMap[score.points];
+            if (!spriteInfo) return;
+
+            // Center the score sprite on the position, round to integers for crisp rendering
+            const drawX = Math.round(score.x + (TILE_SIZE - spriteInfo.w) / 2);
+            const drawY = Math.round(score.y);
+
+            this.ctx.drawImage(
+                this.scoreSheet,
+                spriteInfo.x,
+                spriteInfo.y,
+                spriteInfo.w,
+                spriteInfo.h,
+                drawX,
+                drawY,
+                spriteInfo.w,
+                spriteInfo.h
+            );
+        });
     }
 
     /**

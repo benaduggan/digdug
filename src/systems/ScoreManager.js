@@ -3,6 +3,7 @@ import {
     HI_SCORE_KEY,
     PLAYER,
     SCORES,
+    TILE_SIZE,
 } from '../utils/constants.js';
 
 export class ScoreManager {
@@ -21,37 +22,67 @@ export class ScoreManager {
     }
 
     /**
-     * Add points for enemy kill
+     * Add points for digging a tile
      */
-    addEnemyKill(enemyType, distance = 0) {
-        let points =
-            enemyType === ENEMY_TYPES.POOKA
-                ? SCORES.POOKA_BASE
-                : SCORES.FYGAR_BASE;
+    addDigScore() {
+        const points = SCORES.DIG_TILE;
+        this.addScore(points);
+        return points;
+    }
 
-        // Distance bonus (further away = more points)
-        const distanceBonus =
-            Math.floor(distance / 16) * SCORES.DISTANCE_MULTIPLIER;
-        points += distanceBonus;
+    /**
+     * Calculate depth quarter based on Y position
+     * Sky is rows 0-1, dirt is rows 2-17 (16 rows total)
+     * Quarters of dirt: 2-5 (Q0), 6-9 (Q1), 10-13 (Q2), 14-17 (Q3)
+     */
+    getDepthQuarter(pixelY) {
+        const gridY = Math.floor(pixelY / TILE_SIZE);
+        const dirtStartRow = 2; // Skip sky rows
+        const dirtRows = 16; // 16 rows of dirt
+        const quarterSize = dirtRows / 4; // 4 rows per quarter
+
+        const relativeRow = Math.max(0, gridY - dirtStartRow);
+        return Math.min(3, Math.floor(relativeRow / quarterSize));
+    }
+
+    /**
+     * Add points for enemy kill by pumping
+     * Points based on depth and whether Fygar was killed horizontally
+     */
+    addEnemyKill(enemyType, enemyY, isHorizontalKill = false) {
+        const depthQuarter = this.getDepthQuarter(enemyY);
+        let points;
+
+        if (enemyType === ENEMY_TYPES.FYGAR && isHorizontalKill) {
+            points = SCORES.PUMP_KILL.FYGAR_HORIZONTAL[depthQuarter];
+        } else if (enemyType === ENEMY_TYPES.FYGAR) {
+            points = SCORES.PUMP_KILL.FYGAR[depthQuarter];
+        } else {
+            points = SCORES.PUMP_KILL.POOKA[depthQuarter];
+        }
 
         this.addScore(points);
         return points;
     }
 
     /**
-     * Add points for rock kill
+     * Add points for rock kill based on number of enemies killed
      */
-    addRockKill(enemyType) {
-        const points = SCORES.ROCK_KILL;
+    addRockKill(enemyCount) {
+        // Cap at index 8 for 8+ enemies
+        const index = Math.min(enemyCount, 8);
+        const points = SCORES.ROCK_KILL[index];
         this.addScore(points);
         return points;
     }
 
     /**
-     * Add points for bonus item
+     * Add points for bonus item based on prize index
      */
-    addBonusItem() {
-        const points = SCORES.BONUS_ITEM;
+    addBonusItem(bonusIndex) {
+        // bonusIndex is 0-based, maps to prize_1 through prize_11
+        const safeIndex = Math.min(bonusIndex, SCORES.BONUS_ITEMS.length - 1);
+        const points = SCORES.BONUS_ITEMS[safeIndex];
         this.addScore(points);
         return points;
     }

@@ -70,11 +70,24 @@ export const ENEMY = {
 
 // Scoring
 export const SCORES = {
-    POOKA_BASE: 200,
-    FYGAR_BASE: 400,
-    ROCK_KILL: 1000,
-    BONUS_ITEM: 500,
-    DISTANCE_MULTIPLIER: 50, // Points per tile away from player when killed
+    DIG_TILE: 10,
+
+    // Depth-based pump kill points
+    // Dirt area: rows 2-17 (16 rows), sky: rows 0-1
+    // Quarters of DIRT ONLY: rows 2-5 (Q1), 6-9 (Q2), 10-13 (Q3), 14-17 (Q4)
+    PUMP_KILL: {
+        POOKA: [200, 300, 400, 500],
+        FYGAR: [200, 300, 400, 500],
+        FYGAR_HORIZONTAL: [400, 600, 800, 1000],
+    },
+
+    // Rock kills by enemy count (index = count, 8+ capped at index 8)
+    ROCK_KILL: [0, 1000, 2500, 4000, 6000, 8000, 10000, 12000, 15000],
+
+    // Prize values (prize_1 through prize_11)
+    BONUS_ITEMS: [
+        400, 600, 800, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
+    ],
 };
 
 // Colors (arcade-accurate)

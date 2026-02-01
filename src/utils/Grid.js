@@ -87,6 +87,21 @@ export class Grid {
     }
 
     /**
+     * Count the number of dirt tiles
+     */
+    countDirt() {
+        let count = 0;
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (this.isDirt(x, y)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
      * Convert pixel coordinates to grid coordinates
      */
     pixelToGrid(px, py) {

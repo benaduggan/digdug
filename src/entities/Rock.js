@@ -25,6 +25,8 @@ export class Rock {
 
         // Track if rock crushed any enemies
         this.crushedEnemy = false;
+        this.enemiesKilled = 0;
+        this.killPositions = []; // Store positions for floating score display
 
         // Track player position to wait for them to move
         this.playerStillBelow = false;
@@ -249,6 +251,25 @@ export class Rock {
      */
     markEnemyCrushed() {
         this.crushedEnemy = true;
+    }
+
+    /**
+     * Increment the kill count and store position for score display
+     */
+    incrementKillCount(enemyX, enemyY) {
+        this.enemiesKilled++;
+        this.killPositions.push({ x: enemyX, y: enemyY });
+        return this.enemiesKilled;
+    }
+
+    /**
+     * Get the last kill position for floating score display
+     */
+    getLastKillPosition() {
+        if (this.killPositions.length > 0) {
+            return this.killPositions[this.killPositions.length - 1];
+        }
+        return { x: this.x, y: this.y };
     }
 
     /**
