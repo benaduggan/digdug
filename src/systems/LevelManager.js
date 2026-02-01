@@ -50,168 +50,137 @@ export class LevelManager {
      * Called after enemies are spawned
      */
     placeRocksAfterEnemies(levelNumber, enemies) {
-        const targetRocks = Math.min(
-            LEVEL.ROCKS_PER_LEVEL + Math.floor(levelNumber / 3),
-            6
-        );
-        const minRocks = 3; // Must have at least 3 boulders
-        const isDisallowedColumn = (x) =>
-            x >= GRID_WIDTH / 2 - 2 && x <= GRID_WIDTH / 2 + 2;
+        // 1. Setup & Pre-calculations
+        const extraRocks = Math.floor(levelNumber / 3);
+        const targetRocks = Math.min(LEVEL.ROCKS_PER_LEVEL + extraRocks, 6);
+        const minRocks = 3;
 
-        this.rocks = []; // Reset rocks array
+        const gridW = GRID_WIDTH;
+        const gridH = GRID_HEIGHT;
+        const midX = gridW / 2;
+        const noGoMin = midX - 2;
+        const noGoMax = midX + 2;
 
-        // Try with strict constraints first
-        let minRockDistance = 10;
-        let minPathDistance = 3;
-        let minEnemyDistance = 6;
+        // Cache enemy grid positions once
+        const enemyGridPos = enemies.map((e) => ({
+            x: Math.floor(e.x / TILE_SIZE),
+            y: Math.floor(e.y / TILE_SIZE),
+        }));
 
-        for (let i = 0; i < targetRocks; i++) {
-            // Find a good position for a rock
-            let attempts = 0;
-            let placed = false;
+        this.rocks = [];
 
-            // If we haven't placed minimum rocks and running out of attempts, relax constraints
-            while (!placed && attempts < 150) {
-                // Relax constraints after many failed attempts
-                if (attempts > 50 && this.rocks.length < minRocks) {
-                    minPathDistance = 2;
-                    minEnemyDistance = 4;
-                    minRockDistance = 4;
+        // 2. Generate Candidate List (All valid dirt tiles)
+        const candidates = [];
+        const padX = 4;
+        const padY = 5;
+
+        for (let y = padY; y < gridH - 10; y++) {
+            for (let x = padX; x < gridW - 8; x++) {
+                // Skip No-Go Zone (Middle)
+                if (x >= noGoMin && x <= noGoMax) continue;
+
+                // Must be dirt
+                if (this.grid.isDirt(x, y)) {
+                    candidates.push({ x, y });
                 }
-                if (attempts > 100 && this.rocks.length < minRocks) {
-                    minPathDistance = 1;
-                    minEnemyDistance = 3;
-                    minRockDistance = 3;
-                }
-                const x = Math.floor(Math.random() * (GRID_WIDTH - 8)) + 4;
-                const y = Math.floor(Math.random() * (GRID_HEIGHT - 10)) + 5;
-
-                // Don't allow rocks within the middle 5 columns
-                if (isDisallowedColumn(x)) {
-                    attempts++;
-                    continue;
-                }
-
-                // Rock position must be dirt
-                if (!this.grid.isDirt(x, y)) {
-                    attempts++;
-                    continue;
-                }
-
-                // Check area around rock for paths - rocks should be completely surrounded by dirt
-                let tooCloseToPath = false;
-                for (let dy = -minPathDistance; dy <= minPathDistance; dy++) {
-                    for (
-                        let dx = -minPathDistance;
-                        dx <= minPathDistance;
-                        dx++
-                    ) {
-                        if (dx === 0 && dy === 0) continue; // Skip rock position itself
-
-                        if (this.grid.isEmpty(x + dx, y + dy)) {
-                            tooCloseToPath = true;
-                            break;
-                        }
-                    }
-                    if (tooCloseToPath) break;
-                }
-
-                if (tooCloseToPath) {
-                    attempts++;
-                    continue;
-                }
-
-                // Check distance from enemies
-                const tooCloseToEnemy = enemies.some((enemy) => {
-                    const enemyGridX = Math.floor(enemy.x / TILE_SIZE);
-                    const enemyGridY = Math.floor(enemy.y / TILE_SIZE);
-                    const dx = Math.abs(enemyGridX - x);
-                    const dy = Math.abs(enemyGridY - y);
-                    return dx < minEnemyDistance && dy < minEnemyDistance;
-                });
-
-                if (tooCloseToEnemy) {
-                    attempts++;
-                    continue;
-                }
-
-                // Check distance from existing rocks
-                const tooCloseToOtherRock = this.rocks.some((existingRock) => {
-                    const dx = Math.abs(existingRock.gridX - x);
-                    const dy = Math.abs(existingRock.gridY - y);
-                    return dx < minRockDistance && dy < minRockDistance;
-                });
-
-                if (!tooCloseToOtherRock) {
-                    this.grid.placeRock(x, y);
-
-                    // Create Rock entity
-                    const rock = new Rock(
-                        x * TILE_SIZE,
-                        y * TILE_SIZE,
-                        this.grid
-                    );
-                    this.rocks.push(rock);
-
-                    placed = true;
-                }
-
-                attempts++;
             }
         }
 
-        // Ensure we have at least the minimum number of boulders
-        // If not, place them with minimal constraints
-        if (this.rocks.length < minRocks) {
-            const rocksNeeded = minRocks - this.rocks.length;
+        // 3. Shuffle Candidates (Fisher-Yates)
+        for (let i = candidates.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+        }
 
-            for (let i = 0; i < rocksNeeded; i++) {
-                let placed = false;
-                let attempts = 0;
+        // 4. Validation Helper
+        const isValidSpot = (
+            candidate,
+            minPathDist,
+            minEnemyDist,
+            minRockDist
+        ) => {
+            const { x, y } = candidate;
 
-                while (!placed && attempts < 200) {
-                    const x = Math.floor(Math.random() * (GRID_WIDTH - 8)) + 4;
-                    const y =
-                        Math.floor(Math.random() * (GRID_HEIGHT - 10)) + 5;
+            // A. Check existing rocks
+            for (let i = 0; i < this.rocks.length; i++) {
+                const r = this.rocks[i];
+                const dx = Math.abs(r.gridX - x);
+                const dy = Math.abs(r.gridY - y);
+                // If minRockDist is 0, we only fail if completely overlapping (dx=0, dy=0)
+                if (dx < minRockDist && dy < minRockDist) return false;
+                if (minRockDist === 0 && dx === 0 && dy === 0) return false;
+            }
 
-                    // Minimal constraints: just needs dirt, not near tunnels
-                    if (this.grid.isDirt(x, y)) {
-                        // Check not too close to tunnels (at least 1 tile away)
-                        let nearTunnel = false;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                if (this.grid.isEmpty(x + dx, y + dy)) {
-                                    nearTunnel = true;
-                                    break;
-                                }
-                            }
-                            if (nearTunnel) break;
-                        }
+            // B. Check enemies
+            // If minEnemyDist is 0, we skip this check (equivalent to original fallback)
+            if (minEnemyDist > 0) {
+                for (let i = 0; i < enemyGridPos.length; i++) {
+                    const e = enemyGridPos[i];
+                    const dx = Math.abs(e.x - x);
+                    const dy = Math.abs(e.y - y);
+                    if (dx < minEnemyDist && dy < minEnemyDist) return false;
+                }
+            }
 
-                        if (!nearTunnel) {
-                            // Check not on top of existing rock
-                            const notOnRock = !this.rocks.some(
-                                (existingRock) => {
-                                    return (
-                                        existingRock.gridX === x &&
-                                        existingRock.gridY === y
-                                    );
-                                }
-                            );
+            // C. Check Path Proximity (Tunnels)
+            // If minPathDist is 1, checks immediate neighbors (3x3)
+            for (let dy = -minPathDist; dy <= minPathDist; dy++) {
+                for (let dx = -minPathDist; dx <= minPathDist; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    if (this.grid.isEmpty(x + dx, y + dy)) return false;
+                }
+            }
 
-                            if (notOnRock) {
-                                this.grid.placeRock(x, y);
-                                const rock = new Rock(
-                                    x * TILE_SIZE,
-                                    y * TILE_SIZE,
-                                    this.grid
-                                );
-                                this.rocks.push(rock);
-                                placed = true;
-                            }
-                        }
-                    }
-                    attempts++;
+            return true;
+        };
+
+        // 5. Execution Passes
+        const passes = [
+            // Pass 1: Strict (Ideal placement) - Try to reach targetRocks
+            {
+                target: targetRocks,
+                path: 3,
+                enemy: 6,
+                rock: 10,
+            },
+            // Pass 2: Relaxed (Compromise) - Try to reach targetRocks
+            {
+                target: targetRocks,
+                path: 2,
+                enemy: 4,
+                rock: 4,
+            },
+            // Pass 3: Desperation (Force Minimum) - ONLY runs if we have < minRocks
+            // mimic original fallback: path=1, enemy=ignored(0), rock=ignored(0)
+            {
+                target: minRocks,
+                path: 1,
+                enemy: 0,
+                rock: 0,
+            },
+        ];
+
+        for (const pass of passes) {
+            // If we have enough rocks for this tier's goal, skip to next pass or finish
+            if (this.rocks.length >= pass.target) continue;
+
+            for (const candidate of candidates) {
+                // Stop immediately if target met
+                if (this.rocks.length >= pass.target) break;
+
+                // Check if spot is occupied by a rock we JUST placed in a previous pass
+                // (Since we are iterating the same list multiple times)
+                if (this.grid.isRock(candidate.x, candidate.y)) continue;
+
+                if (isValidSpot(candidate, pass.path, pass.enemy, pass.rock)) {
+                    this.grid.placeRock(candidate.x, candidate.y);
+                    this.rocks.push(
+                        new Rock(
+                            candidate.x * TILE_SIZE,
+                            candidate.y * TILE_SIZE,
+                            this.grid
+                        )
+                    );
                 }
             }
         }
