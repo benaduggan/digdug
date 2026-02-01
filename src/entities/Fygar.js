@@ -93,11 +93,12 @@ export class Fygar extends Enemy {
             }
 
             // Check if player is in fire range and horizontally aligned
+            // Also verify there's no dirt blocking the fire path
             if (
                 ((this.direction === DIRECTIONS.RIGHT && this.x < player.x) ||
                     (this.direction === DIRECTIONS.LEFT &&
                         this.x > player.x)) &&
-                this.isPlayerInFireRange(player)
+                this.isPlayerInFireRange(player, grid)
             ) {
                 this.startCharging();
             }
@@ -127,8 +128,9 @@ export class Fygar extends Enemy {
 
     /**
      * Check if player is in fire range (horizontally aligned and in front)
+     * Also checks that no dirt blocks the fire path
      */
-    isPlayerInFireRange(player) {
+    isPlayerInFireRange(player, grid) {
         const dx = player.x - this.x;
         const dy = player.y - this.y;
 
@@ -138,22 +140,34 @@ export class Fygar extends Enemy {
         }
 
         // Check if player is in front based on direction and within range
-        if (
-            this.direction === DIRECTIONS.RIGHT &&
-            dx > 0 &&
-            dx < ENEMY.FYGAR.FIRE_RANGE
-        ) {
-            return true;
-        }
-        if (
-            this.direction === DIRECTIONS.LEFT &&
-            dx < 0 &&
-            dx > -ENEMY.FYGAR.FIRE_RANGE
-        ) {
-            return true;
+        const inRange =
+            (this.direction === DIRECTIONS.RIGHT &&
+                dx > 0 &&
+                dx < ENEMY.FYGAR.FIRE_RANGE) ||
+            (this.direction === DIRECTIONS.LEFT &&
+                dx < 0 &&
+                dx > -ENEMY.FYGAR.FIRE_RANGE);
+
+        if (!inRange) {
+            return false;
         }
 
-        return false;
+        // Check for dirt blocking the fire path
+        const fygarGridX = Math.floor((this.x + TILE_SIZE / 2) / TILE_SIZE);
+        const playerGridX = Math.floor((player.x + TILE_SIZE / 2) / TILE_SIZE);
+        const gridY = Math.floor((this.y + TILE_SIZE / 2) / TILE_SIZE);
+
+        const startX = Math.min(fygarGridX, playerGridX);
+        const endX = Math.max(fygarGridX, playerGridX);
+
+        // Check all tiles between Fygar and player for dirt
+        for (let x = startX + 1; x < endX; x++) {
+            if (grid.isDirt(x, gridY)) {
+                return false; // Dirt blocks fire
+            }
+        }
+
+        return true;
     }
 
     /**

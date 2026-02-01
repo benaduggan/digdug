@@ -178,6 +178,29 @@ export class Enemy {
             this.ghostingDuration = 0;
         }
 
+        // Also check if we're adjacent to a tunnel and should snap to it
+        // This prevents enemies from overshooting tunnels while ghosting
+        if (
+            this.isGhosting &&
+            !currentlyInTunnel &&
+            this.ghostingDuration >= this.MIN_GHOST_DURATION
+        ) {
+            const adjacentTunnel = this.findAdjacentTunnel(grid, gx, gy);
+            if (adjacentTunnel) {
+                // Snap to the adjacent tunnel
+                this.x = adjacentTunnel.x * TILE_SIZE;
+                this.y = adjacentTunnel.y * TILE_SIZE;
+                // Update grid tracking
+                this.lastGridX = adjacentTunnel.x;
+                this.lastGridY = adjacentTunnel.y;
+                // Exit ghost mode
+                this.ghostModeTimer = 0;
+                this.canGhostMode = false;
+                this.isGhosting = false;
+                this.ghostingDuration = 0;
+            }
+        }
+
         // Update previous state for next frame
         this.wasInDirt = currentlyInDirt;
 
@@ -608,14 +631,39 @@ export class Enemy {
             return;
         }
 
-        // KEY INSIGHT: Only make decisions at intersections (3+ directions)
-        // or when current direction is invalid
-        // In a straight tunnel (2 directions), just keep going
+        // Evaluate direction choices based on tunnel geometry
         const currentIsValid = validDirections.includes(this.direction);
         const oppositeDirection = this.getOppositeDirection(this.direction);
 
-        if (validDirections.length === 2 && currentIsValid) {
-            // In a straight tunnel or corner - just keep going unless blocked
+        // At a 2-way junction (corner or straight tunnel)
+        if (validDirections.length === 2) {
+            // If current direction is blocked, we must turn
+            if (!currentIsValid) {
+                // Pick the direction that isn't going backwards
+                const newDir = validDirections.find(
+                    (d) => d !== oppositeDirection
+                );
+                if (newDir) {
+                    this.direction = newDir;
+                    this.tilesTraveledInDirection = 0;
+                }
+                return;
+            }
+
+            // Check if this is a corner (not a straight tunnel)
+            // A corner has two perpendicular directions, not opposite ones
+            const isCorner = !validDirections.includes(oppositeDirection);
+
+            if (isCorner) {
+                // At a corner while chasing - consider turning toward player
+                const otherDir = validDirections.find(
+                    (d) => d !== this.direction
+                );
+                if (otherDir && this.shouldTurnToward(player, otherDir)) {
+                    this.direction = otherDir;
+                    this.tilesTraveledInDirection = 0;
+                }
+            }
             return;
         }
 
@@ -720,6 +768,58 @@ export class Enemy {
             default:
                 return direction;
         }
+    }
+
+    /**
+     * Check if turning to a direction would move us closer to player
+     */
+    shouldTurnToward(player, direction) {
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+
+        switch (direction) {
+            case DIRECTIONS.RIGHT:
+                return dx > TILE_SIZE;
+            case DIRECTIONS.LEFT:
+                return dx < -TILE_SIZE;
+            case DIRECTIONS.DOWN:
+                return dy > TILE_SIZE;
+            case DIRECTIONS.UP:
+                return dy < -TILE_SIZE;
+        }
+        return false;
+    }
+
+    /**
+     * Find an adjacent tunnel tile if enemy is close enough to snap to it
+     * Used to exit ghost mode when near a tunnel
+     */
+    findAdjacentTunnel(grid, gx, gy) {
+        // Only snap if we're within a reasonable distance of an adjacent tunnel
+        const snapThreshold = TILE_SIZE * 0.6;
+
+        // Check each adjacent tile
+        const adjacents = [
+            { x: gx - 1, y: gy }, // Left
+            { x: gx + 1, y: gy }, // Right
+            { x: gx, y: gy - 1 }, // Up
+            { x: gx, y: gy + 1 }, // Down
+        ];
+
+        for (const adj of adjacents) {
+            // Check if adjacent tile is a tunnel (empty and not a rock)
+            if (grid.isEmpty(adj.x, adj.y) && !grid.isRock(adj.x, adj.y)) {
+                // Check if we're close enough to this tunnel to snap to it
+                const pixelDistX = Math.abs(this.x - adj.x * TILE_SIZE);
+                const pixelDistY = Math.abs(this.y - adj.y * TILE_SIZE);
+
+                if (pixelDistX < snapThreshold && pixelDistY < snapThreshold) {
+                    return adj;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
