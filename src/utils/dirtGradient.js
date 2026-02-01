@@ -60,7 +60,7 @@ function rgbStringToHSL(rgbStr) {
 }
 
 export function getDirtGradient(level) {
-    const groupIndex = Math.floor((level - 1) / 4);
+    const groupIndex = Math.floor((level - 1) / 5);
     const finalIndex = groupIndex % DIRT_COLORS.length;
     const { DIRT_TOP, DIRT_MID, DIRT_LOW, DIRT_LOWEST } =
         DIRT_COLORS[finalIndex];
