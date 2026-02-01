@@ -11,6 +11,9 @@ export class ScoreManager {
         this.score = 0;
         this.lives = PLAYER.START_LIVES;
         this.highScore = this.loadHighScore();
+
+        // Extra life thresholds: 20,000, 50,000, 100,000, 150,000, ...
+        this.nextExtraLifeThreshold = 20000;
     }
 
     /**
@@ -19,6 +22,7 @@ export class ScoreManager {
     reset() {
         this.score = 0;
         this.lives = PLAYER.START_LIVES;
+        this.nextExtraLifeThreshold = 20000;
     }
 
     /**
@@ -88,10 +92,34 @@ export class ScoreManager {
     }
 
     /**
-     * Add points to score
+     * Add points to score and check for extra life
+     * Returns true if an extra life was awarded
      */
     addScore(points) {
         this.score += points;
+
+        // Check if we crossed an extra life threshold
+        return this.checkExtraLife();
+    }
+
+    /**
+     * Check and award extra life at thresholds:
+     * 20,000, 50,000, then every 50,000 (100,000, 150,000, ...)
+     */
+    checkExtraLife() {
+        if (this.score >= this.nextExtraLifeThreshold) {
+            this.gainLife();
+
+            // Calculate next threshold
+            if (this.nextExtraLifeThreshold === 20000) {
+                this.nextExtraLifeThreshold = 50000;
+            } else {
+                this.nextExtraLifeThreshold += 50000;
+            }
+
+            return true;
+        }
+        return false;
     }
 
     /**
