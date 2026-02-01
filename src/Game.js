@@ -350,7 +350,7 @@ export class Game {
         this.renderer.clear();
 
         // Draw grid (shows the tunnel being dug)
-        this.renderer.drawGrid(this.grid);
+        this.renderer.drawGrid(this.grid, this.levelManager.currentLevel);
 
         // Draw rocks (already placed)
         this.rocks.forEach((rock) => {
@@ -924,7 +924,7 @@ export class Game {
         this.renderer.clear();
 
         // Draw grid (dirt/tunnels)
-        this.renderer.drawGrid(this.grid);
+        this.renderer.drawGrid(this.grid, this.levelManager.currentLevel);
 
         // Draw rocks
         this.rocks.forEach((rock) => {

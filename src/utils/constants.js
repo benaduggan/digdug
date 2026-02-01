@@ -1,5 +1,3 @@
-import { rgbStringToHSL } from './rgbStringToHSL';
-
 // Game dimensions
 export const TILE_SIZE = 16;
 export const GRID_WIDTH = 27;
@@ -94,27 +92,9 @@ export const SCORES = {
 export const COLORS = {
     BACKGROUND: '#000000',
     SKY: 'rgb(0, 0, 145)', // Blue sky for top rows
-    DIRT_LIGHT: 'rgb(244, 187, 64)',
-    DIRT_MID: 'rgb(207, 111, 41)',
-    DIRT_DARK: 'rgb(169, 49, 24)',
-    DIRT_DARKEST: 'rgb(138, 26, 16)',
-    PLAYER_BLUE: '#3498db',
-    PLAYER_WHITE: '#ffffff',
-    POOKA_RED: '#e74c3c',
-    POOKA_YELLOW: '#f1c40f',
-    FYGAR_GREEN: '#2ecc71',
-    FYGAR_RED: '#e74c3c',
-    ROCK_GRAY: '#95a5a6',
     TEXT_WHITE: '#ffffff',
     TEXT_RED: '#e33122',
 };
-
-export const DIRT_GRADIENT = [
-    { stop: 0.0, color: rgbStringToHSL(COLORS.DIRT_LIGHT) },
-    { stop: 0.33, color: rgbStringToHSL(COLORS.DIRT_MID) },
-    { stop: 0.66, color: rgbStringToHSL(COLORS.DIRT_DARK) },
-    { stop: 1.0, color: rgbStringToHSL(COLORS.DIRT_DARKEST) },
-];
 
 // Animation settings
 export const ANIMATION = {

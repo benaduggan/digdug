@@ -7,9 +7,9 @@ import {
     DIRECTIONS,
     DEATH,
     ENEMY_TYPES,
-    DIRT_GRADIENT,
 } from './utils/constants.js';
 import { loadImage } from './utils/loadImage.js';
+import { getDirtGradient } from './utils/dirtGradient.js';
 
 export class Renderer {
     constructor(config) {
@@ -256,7 +256,7 @@ export class Renderer {
      * Draw the grid using cached background for performance
      * Only redraws when grid actually changes
      */
-    drawGrid(grid) {
+    drawGrid(grid, currentLevel) {
         // Check if grid state changed (simple hash of tunnel positions)
         const currentGridState = grid.getStateHash ? grid.getStateHash() : null;
         if (currentGridState !== this.lastGridState) {
@@ -266,7 +266,7 @@ export class Renderer {
 
         // Rebuild background cache if dirty
         if (this.backgroundDirty) {
-            this.renderBackgroundToCache(grid);
+            this.renderBackgroundToCache(grid, currentLevel);
             this.backgroundDirty = false;
         }
 
@@ -274,18 +274,19 @@ export class Renderer {
         this.ctx.drawImage(this.backgroundCanvas, 0, 0);
     }
 
-    getDirtColorHSL(ratio) {
+    getDirtColorHSL(ratio, currentLevel) {
         // Clamp ratio between 0 and 1
         const r = Math.max(0, Math.min(1, ratio));
+        const dirtGradient = getDirtGradient(currentLevel);
 
         // Find the two colors we are between (e.g., Light and Mid)
-        let lower = DIRT_GRADIENT[0];
-        let upper = DIRT_GRADIENT[DIRT_GRADIENT.length - 1];
+        let lower = dirtGradient[0];
+        let upper = dirtGradient[dirtGradient.length - 1];
 
-        for (let i = 0; i < DIRT_GRADIENT.length - 1; i++) {
-            if (r >= DIRT_GRADIENT[i].stop && r <= DIRT_GRADIENT[i + 1].stop) {
-                lower = DIRT_GRADIENT[i];
-                upper = DIRT_GRADIENT[i + 1];
+        for (let i = 0; i < dirtGradient.length - 1; i++) {
+            if (r >= dirtGradient[i].stop && r <= dirtGradient[i + 1].stop) {
+                lower = dirtGradient[i];
+                upper = dirtGradient[i + 1];
                 break;
             }
         }
@@ -316,7 +317,7 @@ export class Renderer {
      * Render the full background to the cache canvas
      * Called only when grid changes
      */
-    renderBackgroundToCache(grid) {
+    renderBackgroundToCache(grid, currentLevel) {
         const ctx = this.backgroundCtx;
 
         // Clear with background color
@@ -345,7 +346,10 @@ export class Renderer {
                     const depthRatio = (y - 2) / (grid.height - 2);
 
                     // 1. Get Calculated HSL
-                    const { h, s, l } = this.getDirtColorHSL(depthRatio);
+                    const { h, s, l } = this.getDirtColorHSL(
+                        depthRatio,
+                        currentLevel
+                    );
 
                     // 2. Draw Base
                     ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
@@ -411,16 +415,6 @@ export class Renderer {
                 // Empty tiles are just the background color (already cleared)
             }
         }
-    }
-
-    /**
-     * Get dirt color based on depth
-     */
-    getDirtColor(depthRatio) {
-        if (depthRatio < 0.25) return COLORS.DIRT_LIGHT;
-        if (depthRatio < 0.5) return COLORS.DIRT_MID;
-        if (depthRatio < 0.75) return COLORS.DIRT_DARK;
-        return COLORS.DIRT_DARKEST;
     }
 
     /**
