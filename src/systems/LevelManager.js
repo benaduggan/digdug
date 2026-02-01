@@ -194,33 +194,50 @@ export class LevelManager {
     spawnEnemies(levelNumber) {
         const enemies = [];
         const MAX_ENEMIES = 8;
+        const MAX_FYGAR_RATIO = 2 / 3; // Approx 0.66
 
-        // 1. Calculate Base Count (Step logic)
+        // --- 1. Calculate Total Enemy Count ---
+
         // Level 0-9: Tier 0 (+4 base) = 4
         // Level 10-19: Tier 1 (+4 base) = 5
         // ...
         const levelTier = Math.floor(levelNumber / 10);
-        let count = 3 + levelTier;
+        let count = 4 + levelTier;
 
-        // 2. Add Random Variance (0 or 1)
-        // This creates the range (e.g. 3-4, 4-5, 5-6, 6-7)
-        // We don't add variance if we are already at the max to avoid overshooting
-        if (count < MAX_ENEMIES) {
+        // Add Random Variance (Only for level 10+)
+        // Levels 1-9: Fixed at 4
+        // Levels 10-19: Fluctuates 5-6
+        if (levelNumber >= 10 && count < MAX_ENEMIES) {
             count += Math.round(Math.random());
         }
 
-        // 3. Hard Cap at 8 enemies (Handles Level 50+)
+        // Hard Cap at 8 enemies
         const numEnemies = Math.min(count, MAX_ENEMIES);
 
-        // --- Original Ratio Logic Preserved ---
+        // --- 2. Calculate Fygar Ratio ---
 
-        // Calculate Pooka/Fygar ratio (more Fygars in later levels)
-        // Caps at 50% Fygars
-        const fygarRatio = Math.min(0.5, 0.2 + levelNumber * 0.05);
-        const numFygars = Math.floor(numEnemies * fygarRatio);
+        // Base 0.25, increases by 0.1 every 10 levels
+        // Level 0-9:   0.25
+        // Level 10-19: 0.35
+        // Level 40-49: 0.65 (Reaches approx max)
+        let fygarRatio = 0.25 + levelTier * 0.1;
+
+        // Cap at 2/3
+        fygarRatio = Math.min(fygarRatio, MAX_FYGAR_RATIO);
+
+        // --- 3. Determine Counts ---
+
+        // Calculate raw Fygar count
+        let numFygars = Math.floor(numEnemies * fygarRatio);
+
+        // Force at least 1 Fygar always
+        numFygars = Math.max(1, numFygars);
+
+        // Calculate Pookas (Total - Fygars)
         const numPookas = numEnemies - numFygars;
 
-        // Create tunnels for enemies
+        // --- 4. Spawning ---
+
         this.createEnemyTunnels(numEnemies);
 
         // Spawn Pookas
@@ -231,7 +248,6 @@ export class LevelManager {
 
         // Spawn Fygars
         for (let i = 0; i < numFygars; i++) {
-            // Offset the spawn index by numPookas so they don't spawn on top of Pookas
             const pos = this.getEnemySpawnPosition(numPookas + i);
             enemies.push(new Fygar(pos.x, pos.y, levelNumber));
         }
