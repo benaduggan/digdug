@@ -87,6 +87,11 @@ export class Enemy {
 
         // Track previous tile state for dirt-to-tunnel detection
         this.wasInDirt = false;
+
+        // Escape state (for last enemy)
+        this.isLastEnemy = false;
+        this.isEscaping = false;
+        this.hasEscaped = false;
     }
 
     /**
@@ -125,7 +130,7 @@ export class Enemy {
 
         // Update AI state based on player distance
         if (player) {
-            this.updateAI(deltaTime, player, grid);
+            this.updateAI(deltaTime, player);
         }
 
         // Update ghost mode timer and detect tunnel transitions (after AI so state is current)
@@ -134,6 +139,14 @@ export class Enemy {
         // Move enemy
         if (this.isMoving && !this.isInflating) {
             this.move(grid, player);
+        }
+
+        // Check if enemy has escaped (walked fully off-screen)
+        if (this.isEscaping && !this.hasEscaped) {
+            // Only mark as escaped when fully off the left edge of the screen
+            if (this.x + TILE_SIZE <= 0) {
+                this.hasEscaped = true;
+            }
         }
 
         // Update animation
@@ -214,9 +227,20 @@ export class Enemy {
             }
         }
 
-        // Ghost mode activation - when timer elapsed (regardless of AI state)
-        if (this.canGhostMode && !this.isGhosting && player) {
-            // Activate ghost mode to take direct path to player
+        // Ghost mode activation - when timer elapsed
+        // Don't activate ghost mode if escaping at row 1 (unless chasing)
+        const atEscapeRow = gy <= 1;
+        const blockGhostForEscape =
+            this.isEscaping && this.state === 'escaping' && atEscapeRow;
+
+        const canActivateGhost =
+            this.canGhostMode &&
+            !this.isGhosting &&
+            player &&
+            !blockGhostForEscape;
+
+        if (canActivateGhost) {
+            // Activate ghost mode
             this.isGhosting = true;
             this.ghostingDuration = 0;
         }
@@ -225,7 +249,35 @@ export class Enemy {
     /**
      * Update AI behavior
      */
-    updateAI(deltaTime, player, grid) {
+    updateAI(deltaTime, player) {
+        // If last enemy and not chasing, try to escape
+        if (this.isLastEnemy && this.state !== 'chasing') {
+            if (!this.isEscaping) {
+                this.isEscaping = true;
+                this.state = 'escaping';
+                this.stateTimer = 0;
+            }
+        }
+
+        // If escaping, don't switch to other states unless player gets very close
+        if (this.isEscaping) {
+            const dx = this.x - player.x;
+            const dy = this.y - player.y;
+            const distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
+
+            // Only chase if player is very close (4 tiles)
+            const ESCAPE_CHASE_DISTANCE = TILE_SIZE * 4;
+            if (distanceToPlayer <= ESCAPE_CHASE_DISTANCE) {
+                this.state = 'chasing';
+            } else {
+                this.state = 'escaping';
+            }
+
+            this.stateTimer += deltaTime;
+            this.directionChangeTimer += deltaTime;
+            return;
+        }
+
         // Calculate distance to player
         const dx = this.x - player.x;
         const dy = this.y - player.y;
@@ -283,6 +335,8 @@ export class Enemy {
             // At a new tile, decide direction based on AI state
             if (player && this.state === 'chasing') {
                 this.decideDirectionAtTile(player, grid, gx, gy);
+            } else if (this.state === 'escaping') {
+                this.escapeAtTile(grid, gx, gy);
             } else if (this.state === 'roaming') {
                 this.roamAtTile(grid, gx, gy);
             }
@@ -291,6 +345,9 @@ export class Enemy {
             // This handles the case where we're passing through an intersection
             // and need to turn toward the player
             this.checkForBetterDirection(player, grid, gx, gy);
+        } else if (this.state === 'escaping') {
+            // Check for better escape direction mid-tile
+            this.checkForBetterEscapeDirection(grid, gx, gy);
         }
 
         // Calculate new position based on direction
@@ -338,16 +395,28 @@ export class Enemy {
     }
 
     /**
-     * Ghost mode movement - move directly toward player through dirt
+     * Ghost mode movement - move directly toward target through dirt
+     * When escaping, moves toward exit point; otherwise toward player
      * Uses subclass ghostSpeed if defined, otherwise 80% of base speed
      */
     moveGhost(grid, player) {
         // Use subclass-specific ghostSpeed if available (Pooka/Fygar have different speeds)
         const ghostSpeed = this.ghostSpeed || this.speed * 0.8;
 
-        // Calculate direction toward player
-        const dx = player.x - this.x;
-        const dy = player.y - this.y;
+        // Determine target: when escaping, ghost straight up; otherwise toward player
+        let targetX, targetY;
+        if (this.isEscaping && this.state === 'escaping') {
+            // Ghost straight up - stay at same X, target top of screen
+            targetX = this.x;
+            targetY = -TILE_SIZE;
+        } else {
+            targetX = player.x;
+            targetY = player.y;
+        }
+
+        // Calculate direction toward target
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         // If very close to player, just use cardinal direction
@@ -937,6 +1006,156 @@ export class Enemy {
     }
 
     /**
+     * Escape behavior when entering a new tile
+     * Try to head up and left to exit at row 1
+     * Avoids dead ends to prevent getting stuck
+     */
+    escapeAtTile(grid, gx, gy) {
+        // At row 1 near the left edge, force LEFT to walk off screen
+        if (gy === 1 && gx <= 1) {
+            this.direction = DIRECTIONS.LEFT;
+            return;
+        }
+
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
+
+        if (validDirections.length === 0) return;
+
+        // If only one direction, take it (no choice)
+        if (validDirections.length === 1) {
+            this.direction = validDirections[0];
+            return;
+        }
+
+        // Get direction to previous tile (to avoid going backwards into dead ends)
+        const directionToPrevTile = this.getDirectionToTile(
+            gx,
+            gy,
+            this.prevGridX,
+            this.prevGridY
+        );
+
+        // Filter out dead-end directions to avoid getting stuck
+        const viableDirections = validDirections.filter((dir) =>
+            this.isViableDirection(grid, gx, gy, dir)
+        );
+
+        // Also avoid going back the way we came (to prevent oscillation in dead ends)
+        // Only apply this if there are other viable options
+        const nonReverseViable = viableDirections.filter(
+            (dir) => dir !== directionToPrevTile
+        );
+        const directionsToConsider =
+            nonReverseViable.length > 0 ? nonReverseViable : viableDirections;
+
+        // If no viable directions, use valid directions (but avoid reverse if possible)
+        let finalDirections = directionsToConsider;
+        if (finalDirections.length === 0) {
+            const nonReverseValid = validDirections.filter(
+                (dir) => dir !== directionToPrevTile
+            );
+            finalDirections =
+                nonReverseValid.length > 0 ? nonReverseValid : validDirections;
+        }
+
+        // Prioritize directions: UP first, then LEFT, to reach exit at top-left
+        // The exit is at row 1 (gy === 1), and we want to go left to x=0
+        const priorityOrder = [
+            DIRECTIONS.UP,
+            DIRECTIONS.LEFT,
+            DIRECTIONS.DOWN,
+            DIRECTIONS.RIGHT,
+        ];
+
+        // If we're already at row 1, prioritize LEFT to reach the exit
+        if (gy <= 1) {
+            priorityOrder[0] = DIRECTIONS.LEFT;
+            priorityOrder[1] = DIRECTIONS.UP;
+        }
+
+        // Pick the highest priority viable direction
+        for (const dir of priorityOrder) {
+            if (finalDirections.includes(dir)) {
+                this.direction = dir;
+                return;
+            }
+        }
+
+        // Fallback: pick any valid direction
+        this.direction = validDirections[0];
+    }
+
+    /**
+     * Check for better escape direction mid-tile (at intersections)
+     */
+    checkForBetterEscapeDirection(grid, gx, gy) {
+        const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
+
+        // Only consider turns at intersections (3+ directions)
+        if (validDirections.length < 3) {
+            return;
+        }
+
+        // If current direction is not valid, don't change here
+        if (!validDirections.includes(this.direction)) {
+            return;
+        }
+
+        // Determine preferred escape direction
+        let preferredDirection;
+        if (gy <= 1) {
+            // At top row, prefer LEFT
+            preferredDirection = DIRECTIONS.LEFT;
+        } else {
+            // Otherwise prefer UP
+            preferredDirection = DIRECTIONS.UP;
+        }
+
+        // If already going preferred direction, no change needed
+        if (this.direction === preferredDirection) {
+            return;
+        }
+
+        // Check if preferred direction is valid
+        if (!validDirections.includes(preferredDirection)) {
+            return;
+        }
+
+        // Check alignment for perpendicular turns
+        const isCurrentHorizontal =
+            this.direction === DIRECTIONS.LEFT ||
+            this.direction === DIRECTIONS.RIGHT;
+        const isPreferredHorizontal =
+            preferredDirection === DIRECTIONS.LEFT ||
+            preferredDirection === DIRECTIONS.RIGHT;
+        const isPerpendicular = isCurrentHorizontal !== isPreferredHorizontal;
+
+        const tileCenterX = gx * TILE_SIZE;
+        const tileCenterY = gy * TILE_SIZE;
+
+        if (isPerpendicular) {
+            let alignmentError;
+            if (isCurrentHorizontal) {
+                alignmentError = Math.abs(this.x - tileCenterX);
+            } else {
+                alignmentError = Math.abs(this.y - tileCenterY);
+            }
+
+            const tolerance = this.speed;
+            if (alignmentError <= tolerance) {
+                this.direction = preferredDirection;
+                this.tilesTraveledInDirection = 0;
+                this.x = tileCenterX;
+                this.y = tileCenterY;
+            }
+        } else {
+            // Non-perpendicular change
+            this.direction = preferredDirection;
+            this.tilesTraveledInDirection = 0;
+        }
+    }
+
+    /**
      * Get valid directions (tunnel tiles) from a specific grid position
      */
     getValidDirectionsFromTile(grid, gx, gy) {
@@ -989,6 +1208,16 @@ export class Enemy {
 
         const { x: gx, y: gy } = grid.pixelToGrid(checkX, checkY);
 
+        // Allow escaping enemy to walk off the left edge at row 1
+        if (
+            this.isEscaping &&
+            this.state === 'escaping' &&
+            direction === DIRECTIONS.LEFT &&
+            gy === 1
+        ) {
+            return true;
+        }
+
         // Top row (sky) is always blocked
         if (gy === 0) {
             return false;
@@ -1037,6 +1266,12 @@ export class Enemy {
 
         if (validDirections.length === 0) return;
 
+        // If escaping, use escape-specific pathfinding
+        if (this.isEscaping && this.state === 'escaping') {
+            this.pickEscapeDirection(grid, gx, gy, validDirections);
+            return;
+        }
+
         // If chasing, prefer direction toward player
         if (player && this.state === 'chasing') {
             const dx = player.x - this.x;
@@ -1069,6 +1304,72 @@ export class Enemy {
         // Pick random valid direction
         this.direction =
             validDirections[Math.floor(Math.random() * validDirections.length)];
+    }
+
+    /**
+     * Pick direction for escaping enemy - navigate tunnels toward exit
+     * Avoids dead ends and prefers directions that lead toward row 1, left side
+     */
+    pickEscapeDirection(grid, gx, gy, validDirections) {
+        // At row 1 near exit, always go left
+        if (gy === 1 && gx <= 1) {
+            this.direction = DIRECTIONS.LEFT;
+            return;
+        }
+
+        // Get direction we just came from (to avoid immediately reversing)
+        const oppositeDirection = this.getOppositeDirection(this.direction);
+
+        // Filter out dead-end directions using viability check
+        const viableDirections = validDirections.filter((dir) =>
+            this.isViableDirection(grid, gx, gy, dir)
+        );
+
+        // Also filter out the direction we came from to avoid oscillation
+        // Only do this if there are other viable options
+        const nonReverseViable = viableDirections.filter(
+            (dir) => dir !== oppositeDirection
+        );
+        const directionsToConsider =
+            nonReverseViable.length > 0 ? nonReverseViable : viableDirections;
+
+        // If no viable directions, fall back to valid directions (excluding reverse if possible)
+        let finalDirections = directionsToConsider;
+        if (finalDirections.length === 0) {
+            const nonReverseValid = validDirections.filter(
+                (dir) => dir !== oppositeDirection
+            );
+            finalDirections =
+                nonReverseValid.length > 0 ? nonReverseValid : validDirections;
+        }
+
+        // Prioritize directions toward the exit (row 1, left side)
+        // Priority: UP first (to reach row 1), then LEFT, then others
+        const priorityOrder =
+            gy <= 1
+                ? [
+                      DIRECTIONS.LEFT,
+                      DIRECTIONS.UP,
+                      DIRECTIONS.DOWN,
+                      DIRECTIONS.RIGHT,
+                  ]
+                : [
+                      DIRECTIONS.UP,
+                      DIRECTIONS.LEFT,
+                      DIRECTIONS.DOWN,
+                      DIRECTIONS.RIGHT,
+                  ];
+
+        // Pick the highest priority viable direction
+        for (const dir of priorityOrder) {
+            if (finalDirections.includes(dir)) {
+                this.direction = dir;
+                return;
+            }
+        }
+
+        // Fallback: pick any valid direction
+        this.direction = validDirections[0];
     }
 
     /**
@@ -1283,5 +1584,10 @@ export class Enemy {
         this.isInflating = false;
         this.deflateTimer = 0;
         this.isMoving = true;
+        // Reset escape state
+        this.isLastEnemy = false;
+        this.isEscaping = false;
+        this.hasEscaped = false;
+        this.state = 'roaming';
     }
 }
