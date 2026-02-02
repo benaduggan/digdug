@@ -17,7 +17,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/IanSmith89/digdug"
+        "url": "git+https://github.com/IanSmith89/digdug.git"
     },
     "license": "MIT",
     "author": "Ian Smith",
