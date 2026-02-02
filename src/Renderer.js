@@ -274,6 +274,24 @@ export class Renderer {
         this.ctx.drawImage(this.backgroundCanvas, 0, 0);
     }
 
+    /**
+     * Get neighbor info for an empty tile
+     * Returns object with booleans for each direction that borders dirt/rock
+     */
+    getEmptyTileNeighbors(grid, x, y) {
+        return {
+            top: !grid.isEmpty(x, y - 1) && y > 1, // y > 1 to exclude sky
+            bottom: !grid.isEmpty(x, y + 1),
+            left: !grid.isEmpty(x - 1, y),
+            right: !grid.isEmpty(x + 1, y),
+            // Diagonals for corner detection
+            topLeft: !grid.isEmpty(x - 1, y - 1) && y > 1,
+            topRight: !grid.isEmpty(x + 1, y - 1) && y > 1,
+            bottomLeft: !grid.isEmpty(x - 1, y + 1),
+            bottomRight: !grid.isEmpty(x + 1, y + 1),
+        };
+    }
+
     getDirtColorHSL(ratio, currentLevel) {
         // Clamp ratio between 0 and 1
         const r = Math.max(0, Math.min(1, ratio));
@@ -311,6 +329,84 @@ export class Renderer {
                 lower.color.l + (upper.color.l - lower.color.l) * mixPercent
             ),
         };
+    }
+
+    /**
+     * Draw pixel edges for an empty tile
+     * OPTIMIZED: Batches all geometry into a single draw call
+     */
+    drawTunnelEdges(ctx, px, py, neighbors, depthRatio, currentLevel) {
+        // 1. Set style once
+        const { h, s, l } = this.getDirtColorHSL(depthRatio, currentLevel);
+        ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
+
+        // 2. Begin a single path for all pixels
+        ctx.beginPath();
+
+        // 3. Add rects to the path (no drawing yet)
+        if (neighbors.top) this.addTunnelEdgePath(ctx, px, py, 'top');
+        if (neighbors.bottom) this.addTunnelEdgePath(ctx, px, py, 'bottom');
+        if (neighbors.left) this.addTunnelEdgePath(ctx, px, py, 'left');
+        if (neighbors.right) this.addTunnelEdgePath(ctx, px, py, 'right');
+
+        // 4. Add corners to the path
+        this.addRoundedCornersPath(ctx, px, py, neighbors);
+
+        // 5. Execute the single draw command
+        ctx.fill();
+    }
+
+    /**
+     * Adds uniform pixel rects to the current path
+     */
+    addTunnelEdgePath(ctx, px, py, side) {
+        // We use local variables for loop limits to avoid property lookup overhead
+        const size = TILE_SIZE;
+
+        if (side === 'top') {
+            for (let dx = 0; dx < size; dx += 4) {
+                ctx.rect(px + dx + 1, py, 2, 1);
+            }
+        } else if (side === 'bottom') {
+            const yPos = py + size - 1;
+            for (let dx = 0; dx < size; dx += 4) {
+                ctx.rect(px + dx + 1, yPos, 2, 1);
+            }
+        } else if (side === 'left') {
+            for (let dy = 0; dy < size; dy += 4) {
+                ctx.rect(px, py + dy + 1, 1, 2);
+            }
+        } else if (side === 'right') {
+            const xPos = px + size - 1;
+            for (let dy = 0; dy < size; dy += 4) {
+                ctx.rect(xPos, py + dy + 1, 1, 2);
+            }
+        }
+    }
+
+    /**
+     * Adds corner rects to the current path
+     */
+    addRoundedCornersPath(ctx, px, py, neighbors) {
+        // Pre-calculate the "far" offsets once
+        const farEdge = TILE_SIZE - 2;
+
+        // Top-left
+        if (neighbors.top && neighbors.left) {
+            ctx.rect(px, py, 2, 2);
+        }
+        // Top-right
+        if (neighbors.top && neighbors.right) {
+            ctx.rect(px + farEdge, py, 2, 2);
+        }
+        // Bottom-left
+        if (neighbors.bottom && neighbors.left) {
+            ctx.rect(px, py + farEdge, 2, 2);
+        }
+        // Bottom-right
+        if (neighbors.bottom && neighbors.right) {
+            ctx.rect(px + farEdge, py + farEdge, 2, 2);
+        }
     }
 
     /**
@@ -411,8 +507,27 @@ export class Renderer {
                             }
                         }
                     }
+                } else if (tile === TILE_TYPES.EMPTY) {
+                    // Draw rounded edges for empty tiles (tunnels)
+                    const neighbors = this.getEmptyTileNeighbors(grid, x, y);
+                    const hasEdge =
+                        neighbors.top ||
+                        neighbors.bottom ||
+                        neighbors.left ||
+                        neighbors.right;
+
+                    if (hasEdge) {
+                        const depthRatio = (y - 2) / (grid.height - 2);
+                        this.drawTunnelEdges(
+                            ctx,
+                            px,
+                            py,
+                            neighbors,
+                            depthRatio,
+                            currentLevel
+                        );
+                    }
                 }
-                // Empty tiles are just the background color (already cleared)
             }
         }
     }
