@@ -20,7 +20,7 @@ A faithful recreation of the classic 1982 Dig Dug arcade game using vanilla Java
 ## Installation
 
 ```bash
-npm install digdug-game
+npm install taizo-hori
 ```
 
 ## Usage
@@ -28,7 +28,7 @@ npm install digdug-game
 ### As an npm package
 
 ```javascript
-import DigDug from 'digdug-game';
+import DigDug from 'taizo-hori';
 
 const game = new DigDug({
     container: document.getElementById('game'),
