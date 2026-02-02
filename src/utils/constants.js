@@ -1,7 +1,7 @@
 // Game dimensions
 export const TILE_SIZE = 16;
 export const GRID_WIDTH = 27;
-export const GRID_HEIGHT = 18;
+export const GRID_HEIGHT = 19;
 export const CANVAS_WIDTH = GRID_WIDTH * TILE_SIZE;
 export const CANVAS_HEIGHT = GRID_HEIGHT * TILE_SIZE;
 export const HI_SCORE_KEY = 'digdug_highscore';

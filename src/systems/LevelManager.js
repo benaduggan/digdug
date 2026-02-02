@@ -275,7 +275,7 @@ export class LevelManager {
         // We filter out the obvious "player start" area early to keep the list small
         const candidates = [];
         const padX = 4;
-        const padY = 4;
+        const padY = 5;
 
         for (let y = padY; y < gridH - padY; y++) {
             for (let x = padX; x < gridW - padX; x++) {

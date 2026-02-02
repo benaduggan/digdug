@@ -279,16 +279,22 @@ export class Renderer {
      * Returns object with booleans for each direction that borders dirt/rock
      */
     getEmptyTileNeighbors(grid, x, y) {
+        const bottomUIRow = grid.height - 1;
+        // Treat bottom UI row as "solid" so tunnels above it render bottom edges
+        const isNeighborDirt = (nx, ny) => {
+            if (ny === bottomUIRow) return true; // Bottom UI row acts as solid for edge rendering
+            return !grid.isEmpty(nx, ny);
+        };
         return {
-            top: !grid.isEmpty(x, y - 1) && y > 1, // y > 1 to exclude sky
-            bottom: !grid.isEmpty(x, y + 1),
-            left: !grid.isEmpty(x - 1, y),
-            right: !grid.isEmpty(x + 1, y),
+            top: isNeighborDirt(x, y - 1) && y > 1, // y > 1 to exclude sky
+            bottom: isNeighborDirt(x, y + 1),
+            left: isNeighborDirt(x - 1, y),
+            right: isNeighborDirt(x + 1, y),
             // Diagonals for corner detection
-            topLeft: !grid.isEmpty(x - 1, y - 1) && y > 1,
-            topRight: !grid.isEmpty(x + 1, y - 1) && y > 1,
-            bottomLeft: !grid.isEmpty(x - 1, y + 1),
-            bottomRight: !grid.isEmpty(x + 1, y + 1),
+            topLeft: isNeighborDirt(x - 1, y - 1) && y > 1,
+            topRight: isNeighborDirt(x + 1, y - 1) && y > 1,
+            bottomLeft: isNeighborDirt(x - 1, y + 1),
+            bottomRight: isNeighborDirt(x + 1, y + 1),
         };
     }
 
@@ -434,6 +440,13 @@ export class Renderer {
                 // Top 2 rows are sky
                 if (y < 2) {
                     ctx.fillStyle = COLORS.SKY;
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    continue;
+                }
+
+                // Bottom row is UI area (black, inaccessible)
+                if (y === grid.height - 1) {
+                    ctx.fillStyle = COLORS.BACKGROUND;
                     ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
                     continue;
                 }
@@ -1168,14 +1181,26 @@ export class Renderer {
             align: 'left',
         });
 
-        // Lives
+        // Lives (bottom-left row, horizontally flipped)
         if (this.spritesLoaded) {
             const sprite = this.sprites['player_digging_horizontal_1'];
             if (sprite && sprite.complete) {
+                const bottomY = CANVAS_HEIGHT - TILE_SIZE;
                 for (let i = 1; i < scoreManager.lives; i++) {
-                    const x = TILE_SIZE * 1.75 + (i - 1) * TILE_SIZE;
-                    const y = 0;
-                    this.ctx.drawImage(sprite, x, y, TILE_SIZE, TILE_SIZE);
+                    const x = (i - 1) * TILE_SIZE + TILE_SIZE / 2;
+                    const y = bottomY + TILE_SIZE / 2;
+                    // Draw flipped horizontally
+                    this.ctx.save();
+                    this.ctx.translate(x, y);
+                    this.ctx.scale(-1, 1);
+                    this.ctx.drawImage(
+                        sprite,
+                        -TILE_SIZE / 2,
+                        -TILE_SIZE / 2,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    );
+                    this.ctx.restore();
                 }
             }
         }
@@ -1197,12 +1222,13 @@ export class Renderer {
             }
         );
 
+        // Round indicator (bottom-right row)
         this.drawText(
             `ROUND ${levelManager.currentLevel}`,
             CANVAS_WIDTH - 4,
-            10,
+            CANVAS_HEIGHT - TILE_SIZE / 2 + 4,
             {
-                size: 6,
+                size: 8,
                 color: COLORS.TEXT_WHITE,
                 align: 'right',
             }
@@ -1244,15 +1270,20 @@ export class Renderer {
     renderRespawning() {
         // Note: Game.js should call this.render() first, then this overlay
         // Overlay "Player 1 Ready" message
-        this.drawText('PLAYER 1', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 3, {
-            size: 10,
-            color: COLORS.TEXT_WHITE,
-            align: 'center',
-        });
+        this.drawText(
+            'PLAYER 1',
+            CANVAS_WIDTH / 2,
+            CANVAS_HEIGHT / 2 - TILE_SIZE / 2,
+            {
+                size: 10,
+                color: COLORS.TEXT_WHITE,
+                align: 'center',
+            }
+        );
         this.drawText(
             'READY!',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + TILE_SIZE + 15,
+            CANVAS_HEIGHT / 2 + TILE_SIZE + 3,
             {
                 size: 10,
                 color: COLORS.TEXT_WHITE,

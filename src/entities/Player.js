@@ -202,8 +202,9 @@ export class Player {
             newX = grid.width * TILE_SIZE - TILE_SIZE;
         }
         if (newY < 0) newY = 0;
-        if (newY > grid.height * TILE_SIZE - TILE_SIZE) {
-            newY = grid.height * TILE_SIZE - TILE_SIZE;
+        // Cannot enter bottom UI row (height - 1)
+        if (newY > (grid.height - 2) * TILE_SIZE) {
+            newY = (grid.height - 2) * TILE_SIZE;
         }
 
         // Dig the tile we're about to move into BEFORE moving
@@ -268,6 +269,8 @@ export class Player {
             const { x: gx, y: gy } = grid.pixelToGrid(corner.x, corner.y);
             // Cannot move into top row (sky boundary)
             if (gy === 0) return false;
+            // Cannot move into bottom UI row
+            if (gy >= grid.height - 1) return false;
             // Cannot move through rocks
             return !grid.isRock(gx, gy);
         });

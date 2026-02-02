@@ -56,8 +56,10 @@ export class Grid {
 
     /**
      * Check if tile is empty (tunnel)
+     * Bottom row is always considered non-empty (UI area)
      */
     isEmpty(x, y) {
+        if (y >= this.height - 1) return false; // Bottom UI row is never empty
         return this.getTile(x, y) === TILE_TYPES.EMPTY;
     }
 
@@ -77,8 +79,10 @@ export class Grid {
 
     /**
      * Dig (remove dirt) at grid position
+     * Cannot dig in bottom UI row
      */
     dig(x, y) {
+        if (y >= this.height - 1) return false; // Cannot dig bottom UI row
         if (this.isDirt(x, y)) {
             this.setTile(x, y, TILE_TYPES.EMPTY);
             return true;
@@ -133,9 +137,11 @@ export class Grid {
 
     /**
      * Check if position (in pixels) is walkable
+     * Bottom UI row is never walkable
      */
     isWalkable(px, py) {
         const { x, y } = this.pixelToGrid(px, py);
+        if (y >= this.height - 1) return false; // Bottom UI row is never walkable
         return this.isEmpty(x, y);
     }
 
@@ -169,10 +175,10 @@ export class Grid {
             { x: newX + entitySize - 1, y: newY + entitySize - 1 },
         ];
 
-        // All corners must be walkable or allow ghosting through dirt
+        // All corners must be within bounds (excluding bottom UI row)
         return corners.every((corner) => {
             const { x, y } = this.pixelToGrid(corner.x, corner.y);
-            return x >= 0 && x < this.width && y >= 0 && y < this.height;
+            return x >= 0 && x < this.width && y >= 0 && y < this.height - 1;
         });
     }
 

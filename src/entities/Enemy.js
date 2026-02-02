@@ -532,7 +532,7 @@ export class Enemy {
     }
 
     /**
-     * Check if ghost can move to position (only sky blocks)
+     * Check if ghost can move to position (sky and bottom UI row block)
      */
     canGhostMoveToPosition(x, y, grid) {
         // Check center point
@@ -542,6 +542,10 @@ export class Enemy {
         );
         // Top row (sky) is always blocked
         if (gy === 0) {
+            return false;
+        }
+        // Bottom UI row is always blocked
+        if (gy >= grid.height - 1) {
             return false;
         }
         // Ghosts can pass through rocks and dirt
