@@ -143,7 +143,15 @@ export class Player {
         }
 
         // Get input direction - but don't move or rotate while pumping
-        const inputDirection = inputManager.getDirection();
+        let inputDirection = inputManager.getDirection();
+
+        // Check if player is in row 1 (sky row, y = TILE_SIZE)
+        const isInSkyRow = this.y <= TILE_SIZE;
+
+        // Prevent looking up when in the sky row
+        if (isInSkyRow && inputDirection === DIRECTIONS.UP) {
+            inputDirection = null; // Block UP input in sky row
+        }
 
         if (inputDirection && !this.isShooting && !this.isPumping) {
             // Track previous direction before changing
@@ -156,6 +164,20 @@ export class Player {
             this.move(inputDirection, grid);
         } else {
             this.isMoving = false;
+        }
+
+        // Auto-set direction when emerging to sky row (row 1)
+        if (
+            isInSkyRow &&
+            (this.direction === DIRECTIONS.UP ||
+                this.direction === DIRECTIONS.DOWN)
+        ) {
+            // Set direction based on current sprite flip state
+            if (this.spriteFlipH) {
+                this.direction = DIRECTIONS.LEFT;
+            } else {
+                this.direction = DIRECTIONS.RIGHT;
+            }
         }
 
         // Update animation

@@ -24,6 +24,7 @@ export class Game {
             height: config.height || CANVAS_HEIGHT,
             scale: config.scale || 1,
             debug: config.debug || false,
+            level: config.level || 1,
             onGameOver: config.onGameOver || (() => {}),
             onLevelComplete: config.onLevelComplete || (() => {}),
             onScoreChange: config.onScoreChange || (() => {}),
@@ -127,15 +128,18 @@ export class Game {
         this.state = GAME_STATES.INTRO;
 
         // Generate the actual level first (creates tunnels, but we'll add player's tunnel too)
-        this.levelManager.generateLevel(1);
+        this.levelManager.generateLevel(this.config.level);
 
         // Create enemies (spawned in tunnels, but frozen during intro)
         this.enemies = this.config.debug
             ? []
-            : this.levelManager.spawnEnemies(1);
+            : this.levelManager.spawnEnemies(this.config.level);
 
         // Create rocks AFTER enemies
-        this.levelManager.placeRocksAfterEnemies(1, this.enemies);
+        this.levelManager.placeRocksAfterEnemies(
+            this.config.level,
+            this.enemies
+        );
         this.rocks = this.levelManager.getRocks();
 
         // Clear bonus items
@@ -1011,71 +1015,77 @@ export class Game {
     }
 
     /**
-     * Render game over
+     * Render game over (overlays the game screen like pause)
      */
     renderGameOver() {
-        this.renderer.forceClear();
+        // Render the game state underneath (like pause screen)
+        this.render();
+
+        // Overlay "GAME OVER" text
         this.renderer.drawText(
             'GAME OVER',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - 40,
+            CANVAS_HEIGHT / 2,
             {
-                size: 12,
-                color: COLORS.TEXT_RED,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText('SCORE', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, {
-            size: 8,
-            color: COLORS.TEXT_WHITE,
-            align: 'center',
-        });
-        this.renderer.drawText(
-            `${this.scoreManager.score}`,
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 20,
-            {
-                size: 10,
-                color: COLORS.TEXT_RED,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText(
-            'PRESS SPACE',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 50,
-            {
-                size: 6,
-                color: COLORS.TEXT_WHITE,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText(
-            'TO RESTART',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 65,
-            {
-                size: 6,
+                size: 16,
                 color: COLORS.TEXT_WHITE,
                 align: 'center',
             }
         );
 
-        // Check if space is pressed to restart (only set up listener once)
+        // Check if space is pressed to return to menu (only set up listener once)
         if (!this.restartListenerAdded) {
             this.restartListenerAdded = true;
-            const restart = (e) => {
+            const returnToMenu = (e) => {
                 if (
                     e.code === 'Space' &&
                     this.state === GAME_STATES.GAME_OVER
                 ) {
-                    document.removeEventListener('keydown', restart);
+                    document.removeEventListener('keydown', returnToMenu);
                     this.restartListenerAdded = false;
-                    this.startGame();
+                    this.resetToMenu();
                 }
             };
-            document.addEventListener('keydown', restart);
+            document.addEventListener('keydown', returnToMenu);
         }
+    }
+
+    /**
+     * Reset everything and return to main menu (like refreshing the page)
+     */
+    resetToMenu() {
+        // Stop the game loop
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+
+        // Reset all game state
+        this.player = null;
+        this.enemies = [];
+        this.rocks = [];
+        this.bonusItems = [];
+        this.floatingScores = [];
+        this.rockRespawnTimer = 0;
+        this.needsRockRespawn = false;
+        this.bonusSpawnCount = 0;
+        this.droppedRocksCount = 0;
+        this.lastDirtCount = 0;
+
+        // Reset managers
+        this.scoreManager.reset();
+        this.levelManager.currentLevel = 1;
+
+        // Reset grid
+        this.grid = new Grid();
+        this.collisionSystem = new CollisionSystem(this.grid);
+        this.levelManager = new LevelManager(this.grid);
+
+        // Mark background as dirty so it redraws
+        this.renderer.markBackgroundDirty();
+
+        // Show menu
+        this.showMenu();
     }
 
     /**

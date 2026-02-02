@@ -137,6 +137,8 @@ export class Renderer {
             'rock_crumbling_1.png',
             'rock_crumbling_2.png',
             'flower_small.png',
+            'flower_large_1.png',
+            'flower_large_2.png',
             'prize_1.png',
             'prize_2.png',
             'prize_3.png',
@@ -1234,19 +1236,55 @@ export class Renderer {
             }
         );
 
-        if (this.spritesLoaded) {
-            const sprite = this.sprites['flower_small'];
-            if (sprite && sprite.complete) {
-                for (let i = 1; i <= levelManager.currentLevel; i++) {
-                    this.ctx.drawImage(
-                        sprite,
-                        CANVAS_WIDTH - TILE_SIZE * i,
-                        TILE_SIZE,
-                        TILE_SIZE,
-                        TILE_SIZE
-                    );
-                }
+        this.drawLevelIndicators(levelManager.currentLevel);
+    }
+
+    drawLevelIndicators(level) {
+        if (!this.spritesLoaded) return;
+
+        // 1. Localize heavy lookups
+        const ctx = this.ctx;
+        const size = TILE_SIZE;
+        const sprites = this.sprites;
+
+        const smallFlower = sprites['flower_small'];
+        const largeFlower1 = sprites['flower_large_1'];
+        const largeFlower2 = sprites['flower_large_2'];
+
+        // 2. Fast Fail: If the basic unit is missing, stop immediately
+        if (!smallFlower || !smallFlower.complete) return;
+
+        // 3. Bitwise Math for integer division (faster than Math.floor)
+        const largeCount = (level / 10) | 0;
+        const smallCount = level % 10;
+
+        let xPos = CANVAS_WIDTH;
+
+        // --- Draw Large Flowers ---
+        // Check existence once, not every loop iteration
+        // Order: large_1 first (rightmost), then alternate large_2, large_1, large_2...
+        // Since we draw right-to-left, we need to reverse the alternation pattern
+        if (
+            largeCount > 0 &&
+            largeFlower1?.complete &&
+            largeFlower2?.complete
+        ) {
+            for (let i = 0; i < largeCount; i++) {
+                xPos -= size;
+
+                // Reverse index so large_1 is always first (rightmost)
+                // i=0 (rightmost) -> large_1, i=1 -> large_2, i=2 -> large_1, etc.
+                const reverseIndex = largeCount - 1 - i;
+                const img = reverseIndex & 1 ? largeFlower2 : largeFlower1;
+
+                ctx.drawImage(img, xPos, size, size, size);
             }
+        }
+
+        // --- Draw Small Flowers ---
+        for (let i = 0; i < smallCount; i++) {
+            xPos -= size;
+            ctx.drawImage(smallFlower, xPos, size, size, size);
         }
     }
 
