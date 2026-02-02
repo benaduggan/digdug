@@ -995,9 +995,9 @@ export class Game {
         this.renderer.drawText(
             `LEVEL ${this.levelManager.currentLevel} `,
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - 10,
+            CANVAS_HEIGHT / 2 - TILE_SIZE / 2 - 2,
             {
-                size: 12,
+                size: 10,
                 color: COLORS.TEXT_WHITE,
                 align: 'center',
             }
@@ -1005,9 +1005,9 @@ export class Game {
         this.renderer.drawText(
             'COMPLETE',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 10,
+            CANVAS_HEIGHT / 2 + TILE_SIZE + 5,
             {
-                size: 12,
+                size: 10,
                 color: COLORS.TEXT_WHITE,
                 align: 'center',
             }

@@ -17,10 +17,10 @@
     ],
     "repository": {
         "type": "git",
-        "url": ""
+        "url": "https://github.com/IanSmith89/digdug"
     },
     "license": "MIT",
-    "author": "",
+    "author": "Ian Smith",
     "type": "module",
     "main": "dist/digdug.js",
     "module": "dist/digdug.esm.js",

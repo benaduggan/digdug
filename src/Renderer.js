@@ -1311,7 +1311,7 @@ export class Renderer {
         this.drawText(
             'PLAYER 1',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - TILE_SIZE / 2,
+            CANVAS_HEIGHT / 2 - TILE_SIZE / 2 - 2,
             {
                 size: 10,
                 color: COLORS.TEXT_WHITE,
@@ -1321,7 +1321,7 @@ export class Renderer {
         this.drawText(
             'READY!',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + TILE_SIZE + 3,
+            CANVAS_HEIGHT / 2 + TILE_SIZE + 5,
             {
                 size: 10,
                 color: COLORS.TEXT_WHITE,
