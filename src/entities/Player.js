@@ -166,20 +166,6 @@ export class Player {
             this.isMoving = false;
         }
 
-        // Auto-set direction when emerging to sky row (row 1)
-        if (
-            isInSkyRow &&
-            (this.direction === DIRECTIONS.UP ||
-                this.direction === DIRECTIONS.DOWN)
-        ) {
-            // Set direction based on current sprite flip state
-            if (this.spriteFlipH) {
-                this.direction = DIRECTIONS.LEFT;
-            } else {
-                this.direction = DIRECTIONS.RIGHT;
-            }
-        }
-
         // Update animation
         if (this.isMoving || this.isPumping) {
             this.animationTimer += deltaTime;

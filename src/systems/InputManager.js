@@ -1,3 +1,5 @@
+import { DIRECTIONS } from '../utils/constants';
+
 export class InputManager {
     constructor() {
         this.keys = new Set();
@@ -102,10 +104,10 @@ export class InputManager {
      * Get movement direction from input
      */
     getDirection() {
-        if (this.isUpPressed()) return 'up';
-        if (this.isDownPressed()) return 'down';
-        if (this.isLeftPressed()) return 'left';
-        if (this.isRightPressed()) return 'right';
+        if (this.isUpPressed()) return DIRECTIONS.UP;
+        if (this.isDownPressed()) return DIRECTIONS.DOWN;
+        if (this.isLeftPressed()) return DIRECTIONS.LEFT;
+        if (this.isRightPressed()) return DIRECTIONS.RIGHT;
         return null;
     }
 
