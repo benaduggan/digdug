@@ -307,6 +307,16 @@ export class Fygar extends Enemy {
     }
 
     /**
+     * Override smoosh to cancel fire state when crushed by rock
+     * Prevents the fire hitbox from persisting after death
+     */
+    smoosh() {
+        // Cancel any active fire before calling parent smoosh
+        this.cancelFire();
+        super.smoosh();
+    }
+
+    /**
      * Reset timers - called on respawn
      */
     resetTimers() {

@@ -438,16 +438,31 @@ export class LevelManager {
 
     /**
      * Spawn bonus item in center of screen
-     * @param {number} bonusIndex - Sequential index for determining which prize to show (0, 1, 2, ...)
      */
-    spawnBonusItem(bonusIndex = 0) {
+    spawnBonusItem() {
         const centerX = Math.floor(GRID_WIDTH / 2) * TILE_SIZE;
         const centerY = Math.floor(GRID_HEIGHT / 2) * TILE_SIZE;
+
+        // 1. Calculate the "Base Index" based on level
+        // (This logic was previously inside drawBonusItem)
+        const level = this.currentLevel || 1;
+        const floorIndex = Math.min(Math.floor((level - 1) / 20), 8);
+
+        // 2. Get the local sequence (0, 1, or 2)
+        // Assume we track a global 'bonusCounter' or random value
+        const rawIndex = this.bonusCounter || 0;
+        const localIndex = rawIndex % 3;
+
+        // 3. CALCULATE THE FINAL IDENTITY NOW
+        // This is the "Real" index (0 = prize_1, 1 = prize_2, etc.)
+        const finalPrizeIndex = Math.min(floorIndex + localIndex, 10); // Max index 10 (Prize 11)
 
         return {
             x: centerX,
             y: centerY,
-            bonusIndex: bonusIndex, // Store the index for sequential prize selection
+            isBonus: true,
+            // Store the final calculated index explicitly
+            prizeIndex: finalPrizeIndex,
             FLASH_START: 3000, // Start flashing after 3 seconds
             FLASH_DURATION: 2000, // Flash for 2 seconds then disappear
             elapsedTime: 0,

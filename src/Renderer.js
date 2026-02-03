@@ -1045,7 +1045,7 @@ export class Renderer {
      * Prizes unlock every 20 levels, spawning in order (0, 1, 2 within available range)
      * Item flashes after 3 seconds and disappears after 5 seconds total
      */
-    drawBonusItem(item, level = 1) {
+    drawBonusItem(item) {
         if (!this.spritesLoaded) return;
 
         const px = item.x;
@@ -1057,19 +1057,7 @@ export class Renderer {
             if (!flashVisible) return; // Skip rendering on flash-off frames
         }
 
-        // 1. Calculate the "Starting Prize" for this level range.
-        // At level 1, start at 0. At level 160, start at 8 (Prize 9).
-        // We use Math.min to ensure we don't exceed the index for Prize 9.
-        const floorIndex = Math.min(Math.floor((level - 1) / 20), 8);
-
-        // 2. Use sequential bonusIndex (cycles through 0, 1, 2) instead of random
-        const localIndex = (item.bonusIndex || 0) % 3;
-
-        // 3. Final Prize Number
-        // This ensures prizes spawn in order within the available range
-        const prizeNumber = Math.min(floorIndex + localIndex + 1, 11);
-
-        const spriteName = `prize_${prizeNumber}`;
+        const spriteName = `prize_${item.prizeIndex + 1}`;
         this.drawSprite(spriteName, px, py, TILE_SIZE, TILE_SIZE);
     }
 

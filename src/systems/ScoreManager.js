@@ -83,9 +83,10 @@ export class ScoreManager {
     /**
      * Add points for bonus item based on prize index
      */
-    addBonusItem(bonusIndex) {
-        // bonusIndex is 0-based, maps to prize_1 through prize_11
-        const safeIndex = Math.min(bonusIndex, SCORES.BONUS_ITEMS.length - 1);
+    addBonusItem(prizeIndex) {
+        // prizeIndex is now the "Real" index
+        // Ensure it doesn't crash if index is out of bounds
+        const safeIndex = Math.min(prizeIndex, SCORES.BONUS_ITEMS.length - 1);
         const points = SCORES.BONUS_ITEMS[safeIndex];
         this.addScore(points);
         return points;

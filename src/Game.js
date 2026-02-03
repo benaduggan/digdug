@@ -617,9 +617,8 @@ export class Game {
                     item
                 )
             ) {
-                const points = this.scoreManager.addBonusItem(item.bonusIndex);
-                this.config.onScoreChange(this.scoreManager.score);
-                // Show floating score at item position
+                // PASS THE LOCKED INDEX
+                const points = this.scoreManager.addBonusItem(item.prizeIndex);
                 this.spawnFloatingScore(points, item.x, item.y);
                 return false;
             }
