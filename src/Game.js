@@ -454,8 +454,12 @@ export class Game {
         // Check collisions
         this.checkCollisions();
 
-        // Check level complete
-        if (!this.config.debug && this.enemies.length === 0) {
+        const enemiesRemaining = this.enemies.length > 0;
+        const rocksCrushing = this.rocks.some(
+            (rock) => rock.isFalling && rock.enemiesKilled > 0
+        );
+
+        if (!this.config.debug && !enemiesRemaining && !rocksCrushing) {
             this.levelComplete();
         }
     }
@@ -575,12 +579,20 @@ export class Game {
         // Remove escaped enemies
         this.enemies = this.enemies.filter((enemy) => !enemy.hasEscaped);
 
-        // Remove destroyed enemies (popped from inflation or smooshed by rock)
+        // Remove destroyed enemies
         this.enemies = this.enemies.filter((enemy) => {
             if (enemy.isDestroyed) {
-                // Only award points for pumped enemies (not smooshed - those are scored when rock finishes)
+                // If it's smooshed, WAIT for the rock to finish before removing from array
+                if (
+                    enemy.isSmooshed &&
+                    enemy.attachedToRock &&
+                    !enemy.attachedToRock.isDestroyed
+                ) {
+                    return true; // Keep it in the array so the level doesn't end
+                }
+
+                // Award points for pumped enemies (non-smooshed)
                 if (!enemy.isSmooshed) {
-                    // Determine if this was a horizontal kill (pump direction from player)
                     const isHorizontalKill =
                         this.player.direction === DIRECTIONS.LEFT ||
                         this.player.direction === DIRECTIONS.RIGHT;
@@ -590,10 +602,9 @@ export class Game {
                         isHorizontalKill
                     );
                     this.config.onScoreChange(this.scoreManager.score);
-                    // Show floating score at enemy position
                     this.spawnFloatingScore(points, enemy.x, enemy.y);
                 }
-                return false;
+                return false; // Remove if pumped/popped or if its rock is finally gone
             }
             return true;
         });
