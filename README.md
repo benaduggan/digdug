@@ -46,8 +46,8 @@ game.start();
 ### Configuration Options
 
 - `container` (HTMLElement, required): DOM element to attach the game canvas
-- `width` (number, default: 448): Game width in pixels
-- `height` (number, default: 448): Game height in pixels
+- `width` (number, default: 432): Game width in pixels
+- `height` (number, default: 304): Game height in pixels
 - `scale` (number, default: 1): Pixel scaling factor for larger displays
 - `debug` (boolean, default: false): Show debug information (hitboxes, grid)
 - `onGameOver` (function): Callback when game ends
@@ -57,9 +57,9 @@ game.start();
 ## Controls
 
 - **Arrow Keys** or **WASD**: Move Dig Dug
-- **Space Bar**: Pump attack (hold to extend, release to retract)
+- **Space**: Pump attack (hold to extend, release to retract)
 - **ESC**: Pause/Resume game
-- **Space** (on menu/game over): Start game
+- **Space** or **Enter** (on menu/game over): Start game
 
 ## Gameplay
 
