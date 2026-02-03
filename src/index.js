@@ -28,7 +28,7 @@ if (typeof window !== 'undefined') {
             },
         });
 
-        game.start();
+        await game.start();
 
         // Make game accessible globally for debugging
         window.digdugGame = game;

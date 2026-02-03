@@ -68,7 +68,9 @@ export class Game {
     /**
      * Initialize the game
      */
-    init() {
+    async init() {
+        await this.renderer.loadSprites();
+
         // Attach canvas to container
         this.renderer.attachTo(this.config.container);
 
@@ -85,13 +87,16 @@ export class Game {
     showMenu() {
         this.state = GAME_STATES.MENU;
         this.renderer.clear();
-        this.renderer.drawMenu();
+        this.renderer.drawMenu(this.scoreManager);
 
         // Wait for space key (only set up listener once)
         if (!this.menuListenerAdded) {
             this.menuListenerAdded = true;
             const startGame = (e) => {
-                if (e.code === 'Space' && this.state === GAME_STATES.MENU) {
+                if (
+                    (e.code === 'Space' || e.code === 'Enter') &&
+                    this.state === GAME_STATES.MENU
+                ) {
                     document.removeEventListener('keydown', startGame);
                     this.menuListenerAdded = false;
                     this.startGame();
@@ -993,7 +998,7 @@ export class Game {
         this.renderer.drawText(
             `LEVEL ${this.levelManager.currentLevel}`,
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - TILE_SIZE / 2 - 2,
+            CANVAS_HEIGHT / 2 - 5,
             {
                 scale: 1,
                 align: 'center',
@@ -1002,7 +1007,7 @@ export class Game {
         this.renderer.drawText(
             'COMPLETE',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + TILE_SIZE + 5,
+            CANVAS_HEIGHT / 2 + 5,
             {
                 scale: 1,
                 align: 'center',
@@ -1086,8 +1091,8 @@ export class Game {
     /**
      * Start the game
      */
-    start() {
-        this.init();
+    async start() {
+        await this.init();
     }
 
     /**

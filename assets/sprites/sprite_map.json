@@ -54,8 +54,14 @@
     { "name": "letter_X", "x": 220, "y": 187, "width": 7, "height": 7 },
     { "name": "letter_Y", "x": 220, "y": 147, "width": 6, "height": 7 },
     { "name": "letter_Z", "x": 220, "y": 179, "width": 7, "height": 7 },
-    { "name": "letter_apostrophe", "x": 44, "y": 174, "width": 3, "height": 4 },
-    { "name": "letter_period", "x": 48, "y": 174, "width": 2, "height": 2 },
+    {
+        "name": "letter_apostrophe",
+        "x": 220,
+        "y": 107,
+        "width": 3,
+        "height": 7
+    },
+    { "name": "letter_period", "x": 220, "y": 115, "width": 2, "height": 7 },
     { "name": "letter_copy", "x": 195, "y": 187, "width": 8, "height": 8 },
     { "name": "letter_bang", "x": 220, "y": 139, "width": 3, "height": 7 },
     { "name": "letter_hyphen", "x": 220, "y": 131, "width": 7, "height": 7 },

@@ -34,7 +34,6 @@ export class Renderer {
         this.spritesheet = null;
         this.sprites = {};
         this.spritesLoaded = false;
-        this.loadSprites();
 
         // Background cache - pre-rendered dirt layer for performance
         this.backgroundCanvas = document.createElement('canvas');
@@ -190,47 +189,76 @@ export class Renderer {
         container.appendChild(this.canvas);
     }
 
-    drawMenu() {
-        if (!this.spritesLoaded || !this.spritesheet) return;
+    drawMenu(scoreManager) {
+        const { ctx, sprites, spritesheet, spritesLoaded } = this;
+        if (!spritesLoaded || !spritesheet) return;
 
-        const titleSprite = this.sprites['dig_dug_title'];
-        if (titleSprite) {
-            const scale = 1.5;
-            const width = titleSprite.width * scale;
-            const height = titleSprite.height * scale;
-            this.ctx.drawImage(
-                this.spritesheet,
-                titleSprite.x,
-                titleSprite.y,
-                titleSprite.width,
-                titleSprite.height,
-                CANVAS_WIDTH / 2 - width / 2,
-                TILE_SIZE * 2,
-                width,
-                height
+        this.drawHiScore(scoreManager);
+
+        /**
+         * Helper to reduce repetitive logic and ensure whole-pixel rendering
+         */
+        const draw = (key, dx, dy) => {
+            const s = sprites[key];
+            if (!s) return;
+
+            // Bitwise OR 0 is a fast way to floor coordinates to integers
+            ctx.drawImage(
+                spritesheet,
+                s.x,
+                s.y,
+                s.width,
+                s.height, // Source
+                dx | 0,
+                dy | 0,
+                s.width,
+                s.height // Destination
             );
-        }
+        };
+
+        // Title - Centered
+        const title = sprites['dig_dug_title'];
+        if (title)
+            draw(
+                'dig_dug_title',
+                (CANVAS_WIDTH - title.width) / 2,
+                TILE_SIZE * 4
+            );
+
+        // Characters (Dig Dug & Enemies)
+        const charY = (CANVAS_HEIGHT * 0.425) | 0;
+        const sideMargin = CANVAS_WIDTH * 0.3;
+
+        if (sprites['dig_dug']) draw('dig_dug', sideMargin, charY);
+
+        const enemies = sprites['enemies'];
+        if (enemies)
+            draw('enemies', CANVAS_WIDTH - enemies.width - sideMargin, charY);
 
         this.drawText(
-            '1 PLAYER',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + TILE_SIZE * 6,
+            '▶ 1 PLAYER',
+            (CANVAS_WIDTH / 2) | 0,
+            (CANVAS_HEIGHT * 0.8) | 0,
             {
                 scale: 1,
                 align: 'center',
             }
         );
 
-        // this.drawText(
-        //     'ARROWS -> MOVE // SPACE -> PUMP // ESC -> PAUSE',
-        //     CANVAS_WIDTH / 2,
-        //     CANVAS_HEIGHT / 2 + TILE_SIZE * 8,
-        //     {
-        //         size: 5,
-        //         color: COLORS.TEXT_WHITE,
-        //         align: 'center',
-        //     }
-        // );
+        // Namco Logo & Copyright
+        const namco = sprites['namco'];
+        if (namco)
+            draw('namco', (CANVAS_WIDTH - namco.width) / 2, CANVAS_HEIGHT - 24);
+
+        this.drawText(
+            '© 1982 NAMCO LTD.',
+            (CANVAS_WIDTH / 2) | 0,
+            (CANVAS_HEIGHT - 5) | 0,
+            {
+                scale: 1,
+                align: 'center',
+            }
+        );
     }
 
     /**
@@ -1054,7 +1082,7 @@ export class Renderer {
 
             // Center the score sprite on the position, round to integers for crisp rendering
             const drawX = Math.round(score.x + (TILE_SIZE - sprite.width) / 2);
-            const drawY = Math.round(score.y);
+            const drawY = Math.round(score.y + (TILE_SIZE - sprite.height) / 2);
 
             this.ctx.drawImage(
                 this.spritesheet,
@@ -1104,6 +1132,23 @@ export class Renderer {
             }
         }
 
+        this.drawHiScore(scoreManager);
+
+        // Round indicator (bottom-right row)
+        this.drawText(
+            `ROUND ${levelManager.currentLevel}`,
+            CANVAS_WIDTH - 4,
+            CANVAS_HEIGHT - TILE_SIZE / 2 + 3,
+            {
+                scale: 1,
+                align: 'right',
+            }
+        );
+
+        this.drawLevelIndicators(levelManager.currentLevel);
+    }
+
+    drawHiScore(scoreManager) {
         // Hi-score (center)
         this.drawText('HI-SCORE', CANVAS_WIDTH / 2, 10, {
             color: COLORS.TEXT_RED,
@@ -1119,19 +1164,6 @@ export class Renderer {
                 align: 'center',
             }
         );
-
-        // Round indicator (bottom-right row)
-        this.drawText(
-            `ROUND ${levelManager.currentLevel}`,
-            CANVAS_WIDTH - 4,
-            CANVAS_HEIGHT - TILE_SIZE / 2 + 3,
-            {
-                scale: 1,
-                align: 'right',
-            }
-        );
-
-        this.drawLevelIndicators(levelManager.currentLevel);
     }
 
     drawLevelIndicators(level) {
