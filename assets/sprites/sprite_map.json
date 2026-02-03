@@ -1,0 +1,386 @@
+[
+    { "name": "score_200", "x": 133, "y": 148, "width": 15, "height": 7 },
+    { "name": "score_300", "x": 106, "y": 114, "width": 15, "height": 7 },
+    { "name": "score_400", "x": 122, "y": 114, "width": 15, "height": 7 },
+    { "name": "score_500", "x": 138, "y": 114, "width": 15, "height": 7 },
+    { "name": "score_600", "x": 161, "y": 169, "width": 15, "height": 7 },
+    { "name": "score_800", "x": 178, "y": 170, "width": 15, "height": 7 },
+    { "name": "score_dash", "x": 149, "y": 148, "width": 11, "height": 5 },
+    { "name": "score_1000", "x": 115, "y": 148, "width": 17, "height": 7 },
+    { "name": "score_2000", "x": 113, "y": 166, "width": 20, "height": 7 },
+    { "name": "score_2500", "x": 134, "y": 166, "width": 20, "height": 7 },
+    { "name": "score_3000", "x": 97, "y": 157, "width": 20, "height": 7 },
+    { "name": "score_4000", "x": 118, "y": 157, "width": 20, "height": 7 },
+    { "name": "score_5000", "x": 139, "y": 157, "width": 20, "height": 7 },
+    { "name": "score_6000", "x": 52, "y": 148, "width": 20, "height": 7 },
+    { "name": "score_7000", "x": 73, "y": 148, "width": 20, "height": 7 },
+    { "name": "score_8000", "x": 94, "y": 148, "width": 20, "height": 7 },
+    { "name": "score_10000", "x": 44, "y": 166, "width": 22, "height": 7 },
+    { "name": "score_12000", "x": 67, "y": 166, "width": 22, "height": 7 },
+    { "name": "score_15000", "x": 90, "y": 166, "width": 22, "height": 7 },
+    { "name": "letter_0", "x": 204, "y": 196, "width": 7, "height": 7 },
+    { "name": "letter_1", "x": 154, "y": 114, "width": 6, "height": 7 },
+    { "name": "letter_2", "x": 204, "y": 204, "width": 7, "height": 7 },
+    { "name": "letter_3", "x": 187, "y": 179, "width": 7, "height": 7 },
+    { "name": "letter_4", "x": 187, "y": 187, "width": 7, "height": 7 },
+    { "name": "letter_5", "x": 153, "y": 131, "width": 7, "height": 7 },
+    { "name": "letter_6", "x": 153, "y": 139, "width": 7, "height": 7 },
+    { "name": "letter_7", "x": 204, "y": 187, "width": 7, "height": 7 },
+    { "name": "letter_8", "x": 212, "y": 51, "width": 7, "height": 7 },
+    { "name": "letter_9", "x": 212, "y": 59, "width": 7, "height": 7 },
+    { "name": "letter_A", "x": 212, "y": 67, "width": 7, "height": 7 },
+    { "name": "letter_B", "x": 212, "y": 75, "width": 7, "height": 7 },
+    { "name": "letter_C", "x": 212, "y": 83, "width": 7, "height": 7 },
+    { "name": "letter_D", "x": 212, "y": 91, "width": 7, "height": 7 },
+    { "name": "letter_E", "x": 212, "y": 99, "width": 7, "height": 7 },
+    { "name": "letter_F", "x": 212, "y": 107, "width": 7, "height": 7 },
+    { "name": "letter_G", "x": 212, "y": 115, "width": 7, "height": 7 },
+    { "name": "letter_H", "x": 212, "y": 123, "width": 7, "height": 7 },
+    { "name": "letter_I", "x": 220, "y": 171, "width": 6, "height": 7 },
+    { "name": "letter_J", "x": 212, "y": 131, "width": 7, "height": 7 },
+    { "name": "letter_K", "x": 212, "y": 139, "width": 7, "height": 7 },
+    { "name": "letter_L", "x": 220, "y": 163, "width": 6, "height": 7 },
+    { "name": "letter_M", "x": 212, "y": 147, "width": 7, "height": 7 },
+    { "name": "letter_N", "x": 212, "y": 155, "width": 7, "height": 7 },
+    { "name": "letter_O", "x": 212, "y": 163, "width": 7, "height": 7 },
+    { "name": "letter_P", "x": 212, "y": 171, "width": 7, "height": 7 },
+    { "name": "letter_Q", "x": 212, "y": 179, "width": 7, "height": 7 },
+    { "name": "letter_R", "x": 212, "y": 187, "width": 7, "height": 7 },
+    { "name": "letter_S", "x": 212, "y": 195, "width": 7, "height": 7 },
+    { "name": "letter_T", "x": 220, "y": 155, "width": 6, "height": 7 },
+    { "name": "letter_U", "x": 212, "y": 203, "width": 7, "height": 7 },
+    { "name": "letter_V", "x": 220, "y": 203, "width": 7, "height": 7 },
+    { "name": "letter_W", "x": 220, "y": 195, "width": 7, "height": 7 },
+    { "name": "letter_X", "x": 220, "y": 187, "width": 7, "height": 7 },
+    { "name": "letter_Y", "x": 220, "y": 147, "width": 6, "height": 7 },
+    { "name": "letter_Z", "x": 220, "y": 179, "width": 7, "height": 7 },
+    { "name": "letter_tick", "x": 44, "y": 174, "width": 3, "height": 4 },
+    { "name": "letter_copy", "x": 195, "y": 187, "width": 8, "height": 8 },
+    { "name": "sprite116", "x": 48, "y": 174, "width": 2, "height": 2 },
+    { "name": "namco_badge", "x": 49, "y": 114, "width": 56, "height": 12 },
+    { "name": "namco", "x": 44, "y": 157, "width": 52, "height": 8 },
+    { "name": "enemies", "x": 0, "y": 49, "width": 88, "height": 64 },
+    { "name": "dig_dug", "x": 89, "y": 49, "width": 50, "height": 64 },
+    { "name": "dig_dug_title", "x": 0, "y": 0, "width": 160, "height": 48 },
+    { "name": "prize_11", "x": 85, "y": 131, "width": 16, "height": 16 },
+    { "name": "prize_10", "x": 102, "y": 131, "width": 16, "height": 16 },
+    { "name": "prize_9", "x": 119, "y": 131, "width": 16, "height": 16 },
+    { "name": "prize_8", "x": 136, "y": 131, "width": 16, "height": 16 },
+    { "name": "prize_7", "x": 140, "y": 91, "width": 16, "height": 16 },
+    { "name": "prize_6", "x": 161, "y": 50, "width": 16, "height": 16 },
+    { "name": "prize_5", "x": 161, "y": 67, "width": 16, "height": 16 },
+    { "name": "prize_4", "x": 161, "y": 84, "width": 16, "height": 16 },
+    { "name": "prize_3", "x": 161, "y": 101, "width": 16, "height": 16 },
+    { "name": "prize_2", "x": 161, "y": 118, "width": 16, "height": 16 },
+    { "name": "prize_1", "x": 161, "y": 135, "width": 16, "height": 16 },
+    { "name": "flower_large_1", "x": 161, "y": 0, "width": 16, "height": 24 },
+    { "name": "flower_large_2", "x": 161, "y": 25, "width": 16, "height": 24 },
+    {
+        "name": "player_smooshed_vertical",
+        "x": 161,
+        "y": 152,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_smooshed_horizontal",
+        "x": 178,
+        "y": 0,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_vertical_5",
+        "x": 178,
+        "y": 17,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_horizontal_5",
+        "x": 178,
+        "y": 34,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_vertical_4",
+        "x": 178,
+        "y": 51,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_horizontal_4",
+        "x": 178,
+        "y": 68,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_vertical_3",
+        "x": 178,
+        "y": 85,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_horizontal_3",
+        "x": 178,
+        "y": 102,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_vertical_2",
+        "x": 178,
+        "y": 119,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_horizontal_2",
+        "x": 178,
+        "y": 136,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_vertical_1",
+        "x": 178,
+        "y": 153,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_dying_horizontal_1",
+        "x": 0,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_pumping_vertical_2",
+        "x": 17,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_pumping_horizontal_2",
+        "x": 34,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_pumping_vertical_1",
+        "x": 51,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_pumping_horizontal_1",
+        "x": 68,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_shooting_vertical",
+        "x": 85,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_shooting_horizontal",
+        "x": 102,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "hose_nozzle_vertical",
+        "x": 119,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "hose_line_vertical",
+        "x": 136,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "hose_nozzle_horizontal",
+        "x": 153,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "hose_line_horizontal",
+        "x": 170,
+        "y": 179,
+        "width": 16,
+        "height": 16
+    },
+    { "name": "flower_small", "x": 195, "y": 0, "width": 16, "height": 16 },
+    {
+        "name": "rock_crumbling_2",
+        "x": 195,
+        "y": 17,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "rock_crumbling_1",
+        "x": 195,
+        "y": 34,
+        "width": 16,
+        "height": 16
+    },
+    { "name": "pooka_smooshed", "x": 195, "y": 51, "width": 16, "height": 16 },
+    { "name": "pooka_popped", "x": 0, "y": 131, "width": 25, "height": 25 },
+    {
+        "name": "pooka_inflating_3",
+        "x": 0,
+        "y": 157,
+        "width": 21,
+        "height": 21
+    },
+    {
+        "name": "pooka_inflating_2",
+        "x": 140,
+        "y": 49,
+        "width": 20,
+        "height": 20
+    },
+    {
+        "name": "pooka_inflating_1",
+        "x": 195,
+        "y": 68,
+        "width": 16,
+        "height": 16
+    },
+    { "name": "fygar_smooshed", "x": 195, "y": 85, "width": 16, "height": 16 },
+    { "name": "fygar_popped", "x": 26, "y": 131, "width": 25, "height": 25 },
+    {
+        "name": "fygar_inflating_3",
+        "x": 22,
+        "y": 157,
+        "width": 21,
+        "height": 21
+    },
+    {
+        "name": "fygar_inflating_2",
+        "x": 140,
+        "y": 70,
+        "width": 20,
+        "height": 20
+    },
+    {
+        "name": "fygar_inflating_1",
+        "x": 195,
+        "y": 102,
+        "width": 16,
+        "height": 16
+    },
+    { "name": "rock_2", "x": 195, "y": 119, "width": 16, "height": 16 },
+    { "name": "rock_1", "x": 195, "y": 136, "width": 16, "height": 16 },
+    { "name": "fygar_fire_3", "x": 0, "y": 114, "width": 48, "height": 16 },
+    { "name": "fygar_fire_2", "x": 52, "y": 131, "width": 32, "height": 16 },
+    { "name": "fygar_fire_1", "x": 195, "y": 153, "width": 16, "height": 16 },
+    {
+        "name": "fygar_ghosting_2",
+        "x": 195,
+        "y": 170,
+        "width": 16,
+        "height": 16
+    },
+    { "name": "fygar_ghosting_1", "x": 0, "y": 196, "width": 16, "height": 16 },
+    { "name": "fygar_walking_2", "x": 17, "y": 196, "width": 16, "height": 16 },
+    { "name": "fygar_walking_1", "x": 34, "y": 196, "width": 16, "height": 16 },
+    {
+        "name": "pooka_ghosting_2",
+        "x": 51,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "pooka_ghosting_1",
+        "x": 68,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    { "name": "pooka_walking_2", "x": 85, "y": 196, "width": 16, "height": 16 },
+    {
+        "name": "pooka_walking_1",
+        "x": 102,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_digging_horizontal_2",
+        "x": 119,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_digging_horizontal_1",
+        "x": 136,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_digging_vertical_2",
+        "x": 153,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_digging_vertical_1",
+        "x": 170,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_walking_vertical_1",
+        "x": 187,
+        "y": 196,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_walking_vertical_2",
+        "x": 212,
+        "y": 0,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_walking_horizontal_1",
+        "x": 212,
+        "y": 17,
+        "width": 16,
+        "height": 16
+    },
+    {
+        "name": "player_walking_horizontal_2",
+        "x": 212,
+        "y": 34,
+        "width": 16,
+        "height": 16
+    }
+]
