@@ -235,11 +235,21 @@ export class Enemy {
         const blockGhostForEscape =
             this.isEscaping && this.state === 'escaping' && atEscapeRow;
 
+        // Don't activate ghost mode if too close to player (within 2 tiles)
+        let tooCloseToPlayer = false;
+        if (player) {
+            const dx = this.x - player.x;
+            const dy = this.y - player.y;
+            const distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
+            tooCloseToPlayer = distanceToPlayer < TILE_SIZE * 2;
+        }
+
         const canActivateGhost =
             this.canGhostMode &&
             !this.isGhosting &&
             player &&
-            !blockGhostForEscape;
+            !blockGhostForEscape &&
+            !tooCloseToPlayer;
 
         if (canActivateGhost) {
             // Activate ghost mode
