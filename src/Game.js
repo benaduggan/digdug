@@ -6,6 +6,7 @@ import {
     TILE_SIZE,
     ENEMY_TYPES,
     DIRECTIONS,
+    LEVEL,
 } from './utils/constants.js';
 import { Renderer } from './Renderer.js';
 import { Grid } from './utils/Grid.js';
@@ -502,8 +503,6 @@ export class Game {
                         rock.markEnemyCrushed(); // Mark rock as having crushed an enemy
                         // Track this kill for multi-kill scoring (scored when rock finishes)
                         rock.incrementKillCount(enemy.x, enemy.y);
-                        this.droppedRocksCount++;
-                        this.checkBonusSpawn();
 
                         // Smoosh the enemy and attach to rock
                         enemy.smoosh();
@@ -551,6 +550,8 @@ export class Game {
         const rocksBeforeFilter = this.rocks.length;
         this.rocks = this.rocks.filter((rock) => {
             if (rock.isDestroyed) {
+                this.droppedRocksCount++;
+                this.checkBonusSpawn();
                 // Score rock kills based on total enemies killed by this rock
                 if (rock.enemiesKilled > 0) {
                     const points = this.scoreManager.addRockKill(
@@ -752,14 +753,17 @@ export class Game {
      * Check if bonus item should spawn
      */
     checkBonusSpawn() {
-        // Spawn bonus after 2 rocks dropped
-        if (this.droppedRocksCount === 2 && this.bonusItems.length === 0) {
+        if (
+            this.droppedRocksCount === LEVEL.ROCKS_FOR_BONUS &&
+            this.bonusItems.length === 0
+        ) {
             const bonusItem = this.levelManager.spawnBonusItem(
                 this.bonusSpawnCount
             );
             if (bonusItem) {
                 this.bonusItems.push(bonusItem);
                 this.bonusSpawnCount++; // Increment for next spawn to get next prize in sequence
+                this.droppedRocksCount = 0;
             }
         }
     }
