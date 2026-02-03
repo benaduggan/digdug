@@ -312,6 +312,9 @@ export class Player {
         }
 
         this.isDigging = isInContactWithDirt;
+
+        if (this.isDigging) this.speed = PLAYER.DIGGING_SPEED;
+        else this.speed = PLAYER.SPEED;
     }
 
     /**

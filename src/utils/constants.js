@@ -36,6 +36,7 @@ export const DIRECTIONS = {
 // Player settings
 export const PLAYER = {
     SPEED: 1.2, // Pixels per frame - player should feel responsive
+    DIGGING_SPEED: 1,
     START_LIVES: 3,
     PUMP_RANGE: TILE_SIZE * 3,
 };
@@ -49,13 +50,13 @@ export const ENEMY_TYPES = {
 export const ENEMY = {
     MIN_GHOST_DURATION: 1200, // Must ghost for at least 1.2 seconds
     POOKA: {
-        SPEED: 0.7, // Pixels per frame in tunnels
+        SPEED: 0.6, // Pixels per frame in tunnels
         POINTS: 200,
         GHOST_SPEED: 0.5, // Speed when moving through dirt
         GHOST_MODE_DELAY: () => 5000 + Math.floor(Math.random() * 3) * 2500, // 5, 7.5, or 10 seconds before entering ghost mode
     },
     FYGAR: {
-        SPEED: 0.6, // Pixels per frame in tunnels
+        SPEED: 0.5, // Pixels per frame in tunnels
         POINTS: 400,
         GHOST_SPEED: 0.4,
         GHOST_MODE_DELAY: 10000, // 10 seconds before entering ghost mode
