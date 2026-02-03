@@ -172,7 +172,7 @@ MIT
 
 ## Credits
 
-Basded the original Dig Dug arcade game by Namco (1982). Sprites courtesy of [Jdaster64](https://www.spriters-resource.com/game_boy_advance/namcomuseum/asset/22728/).
+Based the original Dig Dug arcade game by Namco (1982). Sprites courtesy of [Jdaster64](https://www.spriters-resource.com/game_boy_advance/namcomuseum/asset/22728/).
 
 ## Contributing
 
