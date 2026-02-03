@@ -30,41 +30,11 @@ export class Renderer {
         // Disable image smoothing for pixel-perfect rendering
         this.ctx.imageSmoothingEnabled = false;
 
-        // Sprite cache
+        // Spritesheet and sprite map
+        this.spritesheet = null;
         this.sprites = {};
         this.spritesLoaded = false;
         this.loadSprites();
-
-        // Score sprite sheet (separate from regular sprites)
-        this.scoreSheet = null;
-        this.scoreSheetLoaded = false;
-        this.loadScoreSheet();
-
-        // Score sprite coordinates mapping
-        // Based on score_sheet.png layout:
-        // Row 0: ~, 200, 300, 400, 500, 600, 800, 1000
-        // Row 1: 1000, 2000, 2500, 3000, 4000, 5000, 6000
-        // Row 2: 7000, 8000, 10000, 12000, 15000
-        this.scoreSpriteMap = {
-            200: { x: 23, y: 0, w: 15, h: 7 },
-            300: { x: 42, y: 0, w: 15, h: 7 },
-            400: { x: 61, y: 0, w: 15, h: 7 },
-            500: { x: 81, y: 0, w: 15, h: 7 },
-            600: { x: 100, y: 0, w: 15, h: 7 },
-            800: { x: 119, y: 0, w: 15, h: 7 },
-            1000: { x: 0, y: 15, w: 17, h: 7 },
-            2000: { x: 21, y: 15, w: 20, h: 7 },
-            2500: { x: 45, y: 15, w: 20, h: 7 },
-            3000: { x: 69, y: 15, w: 20, h: 7 },
-            4000: { x: 93, y: 15, w: 20, h: 7 },
-            5000: { x: 117, y: 15, w: 20, h: 7 },
-            6000: { x: 141, y: 15, w: 20, h: 7 },
-            7000: { x: 13, y: 30, w: 20, h: 7 },
-            8000: { x: 40, y: 30, w: 20, h: 7 },
-            10000: { x: 66, y: 30, w: 22, h: 7 },
-            12000: { x: 95, y: 30, w: 22, h: 7 },
-            15000: { x: 124, y: 30, w: 22, h: 7 },
-        };
 
         // Background cache - pre-rendered dirt layer for performance
         this.backgroundCanvas = document.createElement('canvas');
@@ -77,112 +47,140 @@ export class Renderer {
     }
 
     /**
-     * Load sprite images
+     * Load spritesheet and sprite map
      */
-    loadSprites() {
-        const spriteFiles = [
-            'player_walking_horizontal_1.png',
-            'player_walking_horizontal_2.png',
-            'player_walking_vertical_1.png',
-            'player_walking_vertical_2.png',
-            'player_digging_horizontal_1.png',
-            'player_digging_horizontal_2.png',
-            'player_digging_vertical_1.png',
-            'player_digging_vertical_2.png',
-            'player_shooting_horizontal.png',
-            'player_shooting_vertical.png',
-            'player_pumping_horizontal_1.png',
-            'player_pumping_horizontal_2.png',
-            'player_pumping_vertical_1.png',
-            'player_pumping_vertical_2.png',
-            'player_smooshed_horizontal.png',
-            'player_smooshed_vertical.png',
-            'player_dying_horizontal_1.png',
-            'player_dying_horizontal_2.png',
-            'player_dying_horizontal_3.png',
-            'player_dying_horizontal_4.png',
-            'player_dying_horizontal_5.png',
-            'player_dying_vertical_1.png',
-            'player_dying_vertical_2.png',
-            'player_dying_vertical_3.png',
-            'player_dying_vertical_4.png',
-            'player_dying_vertical_5.png',
-            'hose_line_horizontal.png',
-            'hose_line_vertical.png',
-            'hose_nozzle_horizontal.png',
-            'hose_nozzle_vertical.png',
-            'pooka_walking_1.png',
-            'pooka_walking_2.png',
-            'pooka_ghosting_1.png',
-            'pooka_ghosting_2.png',
-            'fygar_walking_1.png',
-            'fygar_walking_2.png',
-            'fygar_ghosting_1.png',
-            'fygar_ghosting_2.png',
-            'fygar_fire_1.png',
-            'fygar_fire_2.png',
-            'fygar_fire_3.png',
-            'pooka_inflating_1.png',
-            'pooka_inflating_2.png',
-            'pooka_inflating_3.png',
-            'pooka_popped.png',
-            'pooka_smooshed.png',
-            'fygar_inflating_1.png',
-            'fygar_inflating_2.png',
-            'fygar_inflating_3.png',
-            'fygar_popped.png',
-            'fygar_smooshed.png',
-            'rock_1.png',
-            'rock_2.png',
-            'rock_crumbling_1.png',
-            'rock_crumbling_2.png',
-            'flower_small.png',
-            'flower_large_1.png',
-            'flower_large_2.png',
-            'prize_1.png',
-            'prize_2.png',
-            'prize_3.png',
-            'prize_4.png',
-            'prize_5.png',
-            'prize_6.png',
-            'prize_7.png',
-            'prize_8.png',
-            'prize_9.png',
-            'prize_10.png',
-            'prize_11.png',
-        ];
+    async loadSprites() {
+        try {
+            // Load spritesheet image and sprite map JSON in parallel
+            const [spritesheetImg, spriteMapResponse] = await Promise.all([
+                loadImage('/assets/sprites/spritesheet.png'),
+                fetch('/assets/sprites/sprite_map.json'),
+            ]);
 
-        let loadedCount = 0;
-        const totalSprites = spriteFiles.length;
+            this.spritesheet = spritesheetImg;
+            const spriteMapArray = await spriteMapResponse.json();
 
-        spriteFiles.forEach((filename) => {
-            const img = new Image();
-            img.onload = () => {
-                loadedCount++;
-                if (loadedCount === totalSprites) {
-                    this.spritesLoaded = true;
-                }
-            };
-            img.onerror = () => {
-                console.warn(`Failed to load sprite: ${filename}`);
-                loadedCount++;
-                if (loadedCount === totalSprites) {
-                    this.spritesLoaded = true;
-                }
-            };
-            const spriteName = filename.replace('.png', '');
-            img.src = `/assets/sprites/${filename}`;
-            this.sprites[spriteName] = img;
-        });
+            // Convert array to lookup object by name
+            this.sprites = {};
+            spriteMapArray.forEach((sprite) => {
+                this.sprites[sprite.name] = sprite;
+            });
+
+            this.spritesLoaded = true;
+        } catch (error) {
+            console.error('Failed to load spritesheet:', error);
+        }
     }
 
     /**
-     * Load the score sprite sheet
+     * Draw a sprite from the spritesheet
+     * @param {string} name - Sprite name from sprite_map.json
+     * @param {number} x - X position to draw at
+     * @param {number} y - Y position to draw at
+     * @param {number|null} width - Draw width (null = use sprite's natural width)
+     * @param {number|null} height - Draw height (null = use sprite's natural height)
+     * @param {boolean} flipH - Flip horizontally
+     * @param {boolean} flipV - Flip vertically
+     * @returns {boolean} - Whether the sprite was drawn successfully
      */
-    async loadScoreSheet() {
-        const img = await loadImage('/assets/sprites/score_sheet.png');
-        this.scoreSheet = img;
-        this.scoreSheetLoaded = true;
+    drawSprite(
+        name,
+        x,
+        y,
+        width = null,
+        height = null,
+        flipH = false,
+        flipV = false
+    ) {
+        if (!this.spritesLoaded || !this.spritesheet) return false;
+
+        const sprite = this.sprites[name];
+        if (!sprite) return false;
+
+        // Use sprite's natural size if not specified
+        const drawWidth = width ?? sprite.width;
+        const drawHeight = height ?? sprite.height;
+
+        if (flipH || flipV) {
+            this.ctx.save();
+            this.ctx.translate(x + drawWidth / 2, y + drawHeight / 2);
+            this.ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+            this.ctx.drawImage(
+                this.spritesheet,
+                sprite.x,
+                sprite.y,
+                sprite.width,
+                sprite.height,
+                -drawWidth / 2,
+                -drawHeight / 2,
+                drawWidth,
+                drawHeight
+            );
+            this.ctx.restore();
+        } else {
+            this.ctx.drawImage(
+                this.spritesheet,
+                sprite.x,
+                sprite.y,
+                sprite.width,
+                sprite.height,
+                x,
+                y,
+                drawWidth,
+                drawHeight
+            );
+        }
+        return true;
+    }
+
+    /**
+     * Draw a sprite centered at a position (useful for variable-size sprites)
+     * @param {string} name - Sprite name from sprite_map.json
+     * @param {number} centerX - Center X position
+     * @param {number} centerY - Center Y position
+     * @param {boolean} flipH - Flip horizontally
+     * @param {boolean} flipV - Flip vertically
+     * @returns {boolean} - Whether the sprite was drawn successfully
+     */
+    drawSpriteCentered(name, centerX, centerY, flipH = false, flipV = false) {
+        if (!this.spritesLoaded || !this.spritesheet) return false;
+
+        const sprite = this.sprites[name];
+        if (!sprite) return false;
+
+        const x = centerX - sprite.width / 2;
+        const y = centerY - sprite.height / 2;
+
+        if (flipH || flipV) {
+            this.ctx.save();
+            this.ctx.translate(centerX, centerY);
+            this.ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+            this.ctx.drawImage(
+                this.spritesheet,
+                sprite.x,
+                sprite.y,
+                sprite.width,
+                sprite.height,
+                -sprite.width / 2,
+                -sprite.height / 2,
+                sprite.width,
+                sprite.height
+            );
+            this.ctx.restore();
+        } else {
+            this.ctx.drawImage(
+                this.spritesheet,
+                sprite.x,
+                sprite.y,
+                sprite.width,
+                sprite.height,
+                x,
+                y,
+                sprite.width,
+                sprite.height
+            );
+        }
+        return true;
     }
 
     /**
@@ -192,16 +190,26 @@ export class Renderer {
         container.appendChild(this.canvas);
     }
 
-    async drawMenu() {
-        const img = await loadImage('/assets/sprites/dig_dug_title.png');
-        const width = img.naturalWidth * 1.5;
-        this.ctx.drawImage(
-            img,
-            CANVAS_WIDTH / 2 - width / 2,
-            TILE_SIZE * 2,
-            width,
-            img.naturalHeight * 1.5
-        );
+    drawMenu() {
+        if (!this.spritesLoaded || !this.spritesheet) return;
+
+        const titleSprite = this.sprites['dig_dug_title'];
+        if (titleSprite) {
+            const scale = 1.5;
+            const width = titleSprite.width * scale;
+            const height = titleSprite.height * scale;
+            this.ctx.drawImage(
+                this.spritesheet,
+                titleSprite.x,
+                titleSprite.y,
+                titleSprite.width,
+                titleSprite.height,
+                CANVAS_WIDTH / 2 - width / 2,
+                TILE_SIZE * 2,
+                width,
+                height
+            );
+        }
 
         this.drawText(
             '▶ 1 PLAYER',
@@ -582,70 +590,47 @@ export class Renderer {
         const px = player.x;
         const py = player.y;
 
-        // Use sprites if loaded, otherwise fallback to simple square
-        if (this.spritesLoaded) {
-            // Determine which sprite set to use (horizontal or vertical, walking or digging)
-            let spriteAction = 'walking';
-            if (player.isDigging) spriteAction = 'digging';
-            else if (player.isPumping) spriteAction = 'pumping';
+        if (!this.spritesLoaded) return;
 
-            let frameNumber = player.animationFrame === 0 ? '_1' : '_2';
-            const orientation = this.getPlayerOrientation(player);
+        // Determine which sprite set to use (horizontal or vertical, walking or digging)
+        let spriteAction = 'walking';
+        if (player.isDigging) spriteAction = 'digging';
+        else if (player.isPumping) spriteAction = 'pumping';
 
-            if (player.isShooting) {
-                spriteAction = 'shooting';
-                frameNumber = '';
-            }
+        let frameNumber = player.animationFrame === 0 ? '_1' : '_2';
+        const orientation = this.getPlayerOrientation(player);
 
-            const sprite =
-                this.sprites[
-                    `player_${spriteAction}_${orientation}${frameNumber}`
-                ];
-
-            if (sprite && sprite.complete) {
-                // Only use save/restore if we need to flip
-                const needsFlip = player.spriteFlipH || player.spriteFlipV;
-
-                if (needsFlip) {
-                    const centerX = px + TILE_SIZE / 2;
-                    const centerY = py + TILE_SIZE / 2;
-                    this.drawFlippedSprite(
-                        centerX,
-                        centerY,
-                        player.spriteFlipH,
-                        player.spriteFlipV,
-                        sprite
-                    );
-                } else {
-                    // No flip needed - draw directly without save/restore
-                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-                }
-            }
+        if (player.isShooting) {
+            spriteAction = 'shooting';
+            frameNumber = '';
         }
+
+        const spriteName = `player_${spriteAction}_${orientation}${frameNumber}`;
+        this.drawSprite(
+            spriteName,
+            px,
+            py,
+            TILE_SIZE,
+            TILE_SIZE,
+            player.spriteFlipH,
+            player.spriteFlipV
+        );
     }
 
     /**
-     * Draw a horizontally or vertically flipped sprite
-     * at TILE_SIZE width and height
+     * Draw a sprite from the spritesheet at TILE_SIZE, centered on position
+     * Used for pump line rendering
      */
-    drawFlippedSprite(centerX, centerY, flipH, flipV, sprite) {
-        this.ctx.save();
-        this.ctx.translate(centerX, centerY);
-        this.ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-        this.ctx.drawImage(
-            sprite,
-            -TILE_SIZE / 2,
-            -TILE_SIZE / 2,
-            TILE_SIZE,
-            TILE_SIZE
-        );
-        this.ctx.restore();
+    drawFlippedSpriteByName(centerX, centerY, flipH, flipV, spriteName) {
+        this.drawSpriteCentered(spriteName, centerX, centerY, flipH, flipV);
     }
 
     /**
      * Draw player death animation
      */
     drawPlayerDeath(player) {
+        if (!this.spritesLoaded) return;
+
         const px = player.x;
         const py = player.y;
         const orientation = this.getPlayerOrientation(player);
@@ -656,60 +641,35 @@ export class Renderer {
             (player.attachedToRock?.isFalling ||
                 player.smooshedDelayTimer < player.SMOOSHED_DELAY)
         ) {
-            const spriteKey = `player_smooshed_${orientation}`;
-            if (this.spritesLoaded) {
-                const sprite = this.sprites[spriteKey];
-                if (sprite && sprite.complete) {
-                    if (player.spriteFlipH) {
-                        const centerX = px + TILE_SIZE / 2;
-                        const centerY = py + TILE_SIZE / 2;
-                        this.drawFlippedSprite(
-                            centerX,
-                            centerY,
-                            true,
-                            false,
-                            sprite
-                        );
-                    } else {
-                        this.ctx.drawImage(
-                            sprite,
-                            px,
-                            py,
-                            TILE_SIZE,
-                            TILE_SIZE
-                        );
-                    }
-                    return;
-                }
-            }
+            const spriteName = `player_smooshed_${orientation}`;
+            this.drawSprite(
+                spriteName,
+                px,
+                py,
+                TILE_SIZE,
+                TILE_SIZE,
+                player.spriteFlipH,
+                false
+            );
+            return;
         }
 
         // Death animation
         const progress = player.deathTimer / DEATH.ANIMATION_DURATION;
         // Calculate frame number (1-5) based on progress
         const frameNumber = Math.min(5, Math.floor(progress * 5) + 1);
-        const spriteKey = `player_dying_${orientation}_${frameNumber}`;
+        const spriteName = `player_dying_${orientation}_${frameNumber}`;
 
-        if (this.spritesLoaded) {
-            const sprite = this.sprites[spriteKey];
-            if (sprite && sprite.complete) {
-                // Apply horizontal flip if needed, but never vertical flip
-                if (player.spriteFlipH) {
-                    const centerX = px + TILE_SIZE / 2;
-                    const centerY = py + TILE_SIZE / 2;
-                    this.drawFlippedSprite(
-                        centerX,
-                        centerY,
-                        true,
-                        false,
-                        sprite
-                    );
-                } else {
-                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-                }
-                return;
-            }
-        }
+        // Apply horizontal flip if needed, but never vertical flip
+        this.drawSprite(
+            spriteName,
+            px,
+            py,
+            TILE_SIZE,
+            TILE_SIZE,
+            player.spriteFlipH,
+            false
+        );
     }
 
     /**
@@ -725,34 +685,24 @@ export class Renderer {
         const px = player.x;
         const py = player.y;
         const endPoint = player.getPumpEndPoint();
-        const ctx = this.ctx;
 
-        // 3. Resolve orientation and sprites immediately
+        // 3. Resolve orientation and sprite names
         const orientation = this.getPlayerOrientation(player);
-        const nozzleSprite = this.sprites[`hose_nozzle_${orientation}`];
-        const lineSprite = this.sprites[`hose_line_${orientation}`];
+        const nozzleName = `hose_nozzle_${orientation}`;
+        const lineName = `hose_line_${orientation}`;
 
-        // Check validity before proceeding with math
-        if (
-            !nozzleSprite ||
-            !nozzleSprite.complete ||
-            !lineSprite ||
-            !lineSprite.complete
-        ) {
+        // Check sprites exist
+        if (!this.sprites[nozzleName] || !this.sprites[lineName]) {
             return;
         }
 
         // 4. Calculate Grid Difference
-        // startX/Y logic inlined here
         const diffX = Math.round((px + halfTile - endPoint.x) / TILE);
         const diffY = Math.round((py + halfTile - endPoint.y) / TILE);
 
         // Cache Flip states
         const flipH = player.spriteFlipH;
         const flipV = player.spriteFlipV;
-
-        // Helper to calculate segments count (exclude the nozzle itself)
-        // If diff is -2 (2 tiles away), we need 1 line segment. |diff| - 1.
 
         // --- DOWN (Player looking DOWN) ---
         if (diffY < 0) {
@@ -762,22 +712,22 @@ export class Renderer {
                 const dx = px + halfTile;
                 let dy = endPoint.y - TILE * 0.25;
 
-                this.drawFlippedSprite(dx, dy, flipH, flipV, nozzleSprite);
+                this.drawSpriteCentered(nozzleName, dx, dy, flipH, flipV);
 
                 while (segments > 0) {
                     dy -= TILE;
-                    this.drawFlippedSprite(dx, dy, flipH, flipV, lineSprite);
+                    this.drawSpriteCentered(lineName, dx, dy, flipH, flipV);
                     segments--;
                 }
             } else {
                 const dx = px;
                 let dy = endPoint.y - TILE * 0.75;
 
-                ctx.drawImage(nozzleSprite, dx, dy, TILE, TILE);
+                this.drawSprite(nozzleName, dx, dy, TILE, TILE);
 
                 while (segments > 0) {
                     dy -= TILE;
-                    ctx.drawImage(lineSprite, dx, dy, TILE, TILE);
+                    this.drawSprite(lineName, dx, dy, TILE, TILE);
                     segments--;
                 }
             }
@@ -788,15 +738,15 @@ export class Renderer {
         if (diffY > 0) {
             let segments = Math.abs(diffY) - 1;
 
-            // Logic: UP always uses drawFlippedSprite
+            // Logic: UP always uses centered draw with flip
             const dx = px + halfTile;
             let dy = endPoint.y + TILE * 0.25;
 
-            this.drawFlippedSprite(dx, dy, flipH, flipV, nozzleSprite);
+            this.drawSpriteCentered(nozzleName, dx, dy, flipH, flipV);
 
             while (segments > 0) {
                 dy += TILE;
-                this.drawFlippedSprite(dx, dy, flipH, flipV, lineSprite);
+                this.drawSpriteCentered(lineName, dx, dy, flipH, flipV);
                 segments--;
             }
             return;
@@ -806,15 +756,15 @@ export class Renderer {
         if (diffX < 0) {
             let segments = Math.abs(diffX) - 1;
 
-            // Logic: RIGHT always uses drawFlippedSprite
+            // Logic: RIGHT always uses centered draw with flip
             let dx = endPoint.x - TILE * 0.25;
             const dy = py + halfTile;
 
-            this.drawFlippedSprite(dx, dy, flipH, flipV, nozzleSprite);
+            this.drawSpriteCentered(nozzleName, dx, dy, flipH, flipV);
 
             while (segments > 0) {
                 dx -= TILE;
-                this.drawFlippedSprite(dx, dy, flipH, flipV, lineSprite);
+                this.drawSpriteCentered(lineName, dx, dy, flipH, flipV);
                 segments--;
             }
             return;
@@ -824,14 +774,14 @@ export class Renderer {
         if (diffX > 0) {
             let segments = Math.abs(diffX) - 1;
 
-            // Logic: LEFT always uses standard drawImage
+            // Logic: LEFT always uses standard draw
             let dx = endPoint.x - TILE * 0.25;
 
-            ctx.drawImage(nozzleSprite, dx, py, TILE, TILE);
+            this.drawSprite(nozzleName, dx, py, TILE, TILE);
 
             while (segments > 0) {
                 dx += TILE;
-                ctx.drawImage(lineSprite, dx, py, TILE, TILE);
+                this.drawSprite(lineName, dx, py, TILE, TILE);
                 segments--;
             }
         }
@@ -841,6 +791,8 @@ export class Renderer {
      * Draw an enemy with inflation, popped, and smooshed states
      */
     drawEnemy(enemy) {
+        if (!this.spritesLoaded) return;
+
         const px = enemy.x;
         const py = enemy.y;
         const centerX = px + TILE_SIZE / 2;
@@ -848,31 +800,62 @@ export class Renderer {
 
         // Handle smooshed state (crushed by rock)
         if (enemy.isSmooshed) {
-            this.drawEnemySmooshed(enemy, centerX, centerY);
+            const spriteName = `${enemy.type}_smooshed`;
+            this.drawSpriteCentered(
+                spriteName,
+                centerX,
+                centerY,
+                enemy.spriteFlipH
+            );
             return;
         }
 
         // Handle popped state (after full inflation)
         if (enemy.isPopped) {
-            this.drawEnemyPopped(enemy, centerX, centerY);
+            const spriteName = `${enemy.type}_popped`;
+            this.drawSpriteCentered(
+                spriteName,
+                centerX,
+                centerY,
+                enemy.spriteFlipH
+            );
             return;
         }
 
         // Handle inflating state (being pumped)
         if (enemy.inflateLevel > 1.0) {
-            this.drawEnemyInflating(enemy, centerX, centerY);
+            // inflateLevel goes from 1.0 to 2.0
+            // Map to sprite stages: 1.0-1.33 = stage 1, 1.33-1.66 = stage 2, 1.66-2.0 = stage 3
+            const inflateProgress = (enemy.inflateLevel - 1.0) / 1.0; // 0 to 1
+            let stage;
+            if (inflateProgress < 0.33) {
+                stage = 1;
+            } else if (inflateProgress < 0.66) {
+                stage = 2;
+            } else {
+                stage = 3;
+            }
+
+            const spriteName = `${enemy.type}_inflating_${stage}`;
+            this.drawSpriteCentered(
+                spriteName,
+                centerX,
+                centerY,
+                enemy.spriteFlipH
+            );
             return;
         }
 
         // Normal state - use walking/ghosting sprites
-        if (this.spritesLoaded) {
-            const frameNumber = enemy.animationFrame === 0 ? '1' : '2';
-            const state = enemy.isGhosting ? 'ghosting' : 'walking';
-            const sprite =
-                this.sprites[`${enemy.type}_${state}_${frameNumber}`];
-
-            this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
-        }
+        const frameNumber = enemy.animationFrame === 0 ? '1' : '2';
+        const state = enemy.isGhosting ? 'ghosting' : 'walking';
+        const spriteName = `${enemy.type}_${state}_${frameNumber}`;
+        this.drawSpriteCentered(
+            spriteName,
+            centerX,
+            centerY,
+            enemy.spriteFlipH
+        );
 
         // Draw fire breath for Fygar
         if (enemy.type === ENEMY_TYPES.FYGAR) {
@@ -882,72 +865,6 @@ export class Renderer {
                 this.drawFygarFire(enemy);
             }
         }
-    }
-
-    /**
-     * Draw enemy in inflating state using inflation sprites
-     * Sprites: inflating_1 (first third), inflating_2 (second third), inflating_3 (final third)
-     * Each sprite has its own size (16x16, 20x20, 21x21) - render at natural size
-     */
-    drawEnemyInflating(enemy, centerX, centerY) {
-        // inflateLevel goes from 1.0 to 2.0
-        // Map to sprite stages: 1.0-1.33 = stage 1, 1.33-1.66 = stage 2, 1.66-2.0 = stage 3
-        const inflateProgress = (enemy.inflateLevel - 1.0) / 1.0; // 0 to 1
-        let stage;
-        if (inflateProgress < 0.33) {
-            stage = 1;
-        } else if (inflateProgress < 0.66) {
-            stage = 2;
-        } else {
-            stage = 3;
-        }
-
-        const spriteName = `${enemy.type}_inflating_${stage}`;
-        const sprite = this.sprites[spriteName];
-
-        this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
-    }
-
-    /**
-     * Draw enemy in popped state (after full inflation)
-     */
-    drawEnemyPopped(enemy, centerX, centerY) {
-        const sprite = this.sprites[`${enemy.type}_popped`];
-        this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
-    }
-
-    /**
-     * Helper to draw enemy sprite with flipping
-     * and renders at natural size
-     */
-    drawEnemySprite(sprite, centerX, centerY, flipH) {
-        if (sprite && sprite.complete) {
-            const spriteWidth = sprite.naturalWidth;
-            const spriteHeight = sprite.naturalHeight;
-
-            this.ctx.save();
-            this.ctx.translate(centerX, centerY);
-
-            if (flipH) this.ctx.scale(-1, 1);
-
-            this.ctx.drawImage(
-                sprite,
-                -spriteWidth / 2,
-                -spriteHeight / 2,
-                spriteWidth,
-                spriteHeight
-            );
-
-            this.ctx.restore();
-        }
-    }
-
-    /**
-     * Draw enemy in smooshed state (crushed by rock)
-     */
-    drawEnemySmooshed(enemy, centerX, centerY) {
-        const sprite = this.sprites[`${enemy.type}_smooshed`];
-        this.drawEnemySprite(sprite, centerX, centerY, enemy.spriteFlipH);
     }
 
     /**
@@ -977,6 +894,8 @@ export class Renderer {
      * Each sprite is already the correct width (1, 2, or 3 tiles), so draw once
      */
     drawFygarFire(enemy) {
+        if (!this.spritesLoaded || !this.spritesheet) return;
+
         const fireHitbox = enemy.getFireHitbox();
         if (!fireHitbox) return;
 
@@ -988,53 +907,59 @@ export class Renderer {
 
         // Use the sprite that matches current fire length
         // fire_1 = 1 tile wide, fire_2 = 2 tiles wide, fire_3 = 3 tiles wide
-        const sprite = this.sprites[`fygar_fire_${tileCount}`];
+        const spriteName = `fygar_fire_${tileCount}`;
+        const sprite = this.sprites[spriteName];
+        if (!sprite) return;
 
-        if (sprite && sprite.complete) {
-            this.ctx.save();
+        // Get sprite dimensions from sprite map
+        const spriteWidth = sprite.width;
+        const spriteHeight = sprite.height;
 
-            // Sprite width is tileCount * TILE_SIZE
-            const spriteWidth = tileCount * TILE_SIZE;
-
-            // Calculate fire position - starts at Fygar's mouth
-            let fireX;
-            if (facingLeft) {
-                // Fire extends to the left from Fygar
-                fireX = enemy.x - spriteWidth;
-            } else {
-                // Fire extends to the right from Fygar
-                fireX = enemy.x + TILE_SIZE;
-            }
-            const fireY = enemy.y;
-
-            // Move to center of fire for flipping
-            const centerX = fireX + spriteWidth / 2;
-            const centerY = fireY + TILE_SIZE / 2;
-
-            this.ctx.translate(centerX, centerY);
-
-            // Flip horizontally if facing right (sprites are drawn facing left)
-            if (!facingLeft) {
-                this.ctx.scale(-1, 1);
-            }
-
-            // Draw sprite centered - use actual sprite dimensions
-            this.ctx.drawImage(
-                sprite,
-                -spriteWidth / 2,
-                -TILE_SIZE / 2,
-                spriteWidth,
-                TILE_SIZE
-            );
-
-            this.ctx.restore();
+        // Calculate fire position - starts at Fygar's mouth
+        let fireX;
+        if (facingLeft) {
+            // Fire extends to the left from Fygar
+            fireX = enemy.x - spriteWidth;
+        } else {
+            // Fire extends to the right from Fygar
+            fireX = enemy.x + TILE_SIZE;
         }
+        const fireY = enemy.y;
+
+        // Move to center of fire for flipping
+        const centerX = fireX + spriteWidth / 2;
+        const centerY = fireY + spriteHeight / 2;
+
+        this.ctx.save();
+        this.ctx.translate(centerX, centerY);
+
+        // Flip horizontally if facing right (sprites are drawn facing left)
+        if (!facingLeft) {
+            this.ctx.scale(-1, 1);
+        }
+
+        // Draw sprite centered from spritesheet
+        this.ctx.drawImage(
+            this.spritesheet,
+            sprite.x,
+            sprite.y,
+            spriteWidth,
+            spriteHeight,
+            -spriteWidth / 2,
+            -spriteHeight / 2,
+            spriteWidth,
+            spriteHeight
+        );
+
+        this.ctx.restore();
     }
 
     /**
      * Draw a rock with shaking and crumbling animations
      */
     drawRock(rock) {
+        if (!this.spritesLoaded) return;
+
         const px = rock.x;
         const py = rock.y;
 
@@ -1054,14 +979,7 @@ export class Renderer {
 
             this.ctx.save();
             this.ctx.globalAlpha = Math.max(0, alpha);
-
-            if (this.spritesLoaded) {
-                const sprite = this.sprites['rock_1'];
-                if (sprite && sprite.complete) {
-                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-                }
-            }
-
+            this.drawSprite('rock_1', px, py, TILE_SIZE, TILE_SIZE);
             this.ctx.restore();
             return;
         }
@@ -1070,35 +988,24 @@ export class Renderer {
         if (rock.isCrumbling) {
             const progress = rock.crumbleTimer / rock.CRUMBLE_DURATION;
             // First half: crumbling_1, second half: crumbling_2
-            const spriteKey =
+            const spriteName =
                 progress < 0.5 ? 'rock_crumbling_1' : 'rock_crumbling_2';
-
-            if (this.spritesLoaded) {
-                const sprite = this.sprites[spriteKey];
-                if (sprite && sprite.complete) {
-                    this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-                    return;
-                }
-            }
+            this.drawSprite(spriteName, px, py, TILE_SIZE, TILE_SIZE);
+            return;
         }
 
         // Calculate shake offset and determine sprite for shaking
-        let spriteKey = 'rock_1';
+        let spriteName = 'rock_1';
 
         if (rock.isShaking) {
             // Alternate between rock_1 and rock_2 every 100ms while shaking
-            spriteKey =
+            spriteName =
                 Math.floor(rock.shakeTimer / 200) % 2 === 0
                     ? 'rock_1'
                     : 'rock_2';
         }
 
-        if (this.spritesLoaded) {
-            const sprite = this.sprites[spriteKey];
-            if (sprite && sprite.complete) {
-                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-            }
-        }
+        this.drawSprite(spriteName, px, py, TILE_SIZE, TILE_SIZE);
     }
 
     /**
@@ -1107,6 +1014,8 @@ export class Renderer {
      * Item flashes after 3 seconds and disappears after 5 seconds total
      */
     drawBonusItem(item, level = 1) {
+        if (!this.spritesLoaded) return;
+
         const px = item.x;
         const py = item.y;
 
@@ -1128,41 +1037,36 @@ export class Renderer {
         // This ensures prizes spawn in order within the available range
         const prizeNumber = Math.min(floorIndex + localIndex + 1, 11);
 
-        const spriteKey = `prize_${prizeNumber}`;
-
-        if (this.spritesLoaded) {
-            const sprite = this.sprites[spriteKey];
-
-            if (sprite && sprite.complete) {
-                this.ctx.drawImage(sprite, px, py, TILE_SIZE, TILE_SIZE);
-            }
-        }
+        const spriteName = `prize_${prizeNumber}`;
+        this.drawSprite(spriteName, px, py, TILE_SIZE, TILE_SIZE);
     }
 
     /**
      * Draw floating score displays
      */
     drawFloatingScores(floatingScores) {
-        if (!this.scoreSheetLoaded || !this.scoreSheet) return;
+        if (!this.spritesLoaded || !this.spritesheet) return;
 
         floatingScores.forEach((score) => {
-            const spriteInfo = this.scoreSpriteMap[score.points];
-            if (!spriteInfo) return;
+            // Look up sprite by score_[points] name (e.g., score_200, score_1000)
+            const spriteName = `score_${score.points}`;
+            const sprite = this.sprites[spriteName];
+            if (!sprite) return;
 
             // Center the score sprite on the position, round to integers for crisp rendering
-            const drawX = Math.round(score.x + (TILE_SIZE - spriteInfo.w) / 2);
+            const drawX = Math.round(score.x + (TILE_SIZE - sprite.width) / 2);
             const drawY = Math.round(score.y);
 
             this.ctx.drawImage(
-                this.scoreSheet,
-                spriteInfo.x,
-                spriteInfo.y,
-                spriteInfo.w,
-                spriteInfo.h,
+                this.spritesheet,
+                sprite.x,
+                sprite.y,
+                sprite.width,
+                sprite.height,
                 drawX,
                 drawY,
-                spriteInfo.w,
-                spriteInfo.h
+                sprite.width,
+                sprite.height
             );
         });
     }
@@ -1185,25 +1089,20 @@ export class Renderer {
 
         // Lives (bottom-left row, horizontally flipped)
         if (this.spritesLoaded) {
-            const sprite = this.sprites['player_digging_horizontal_1'];
-            if (sprite && sprite.complete) {
-                const bottomY = CANVAS_HEIGHT - TILE_SIZE;
-                for (let i = 1; i < scoreManager.lives; i++) {
-                    const x = (i - 1) * TILE_SIZE + TILE_SIZE / 2;
-                    const y = bottomY + TILE_SIZE / 2;
-                    // Draw flipped horizontally
-                    this.ctx.save();
-                    this.ctx.translate(x, y);
-                    this.ctx.scale(-1, 1);
-                    this.ctx.drawImage(
-                        sprite,
-                        -TILE_SIZE / 2,
-                        -TILE_SIZE / 2,
-                        TILE_SIZE,
-                        TILE_SIZE
-                    );
-                    this.ctx.restore();
-                }
+            const bottomY = CANVAS_HEIGHT - TILE_SIZE;
+            for (let i = 1; i < scoreManager.lives; i++) {
+                const x = (i - 1) * TILE_SIZE;
+                const y = bottomY;
+                // Draw flipped horizontally
+                this.drawSprite(
+                    'player_digging_horizontal_1',
+                    x,
+                    y,
+                    TILE_SIZE,
+                    TILE_SIZE,
+                    true, // flipH
+                    false
+                );
             }
         }
 
@@ -1242,32 +1141,24 @@ export class Renderer {
     drawLevelIndicators(level) {
         if (!this.spritesLoaded) return;
 
-        // 1. Localize heavy lookups
-        const ctx = this.ctx;
         const size = TILE_SIZE;
-        const sprites = this.sprites;
 
-        const smallFlower = sprites['flower_small'];
-        const largeFlower1 = sprites['flower_large_1'];
-        const largeFlower2 = sprites['flower_large_2'];
+        // Check sprite existence
+        if (!this.sprites['flower_small']) return;
 
-        // 2. Fast Fail: If the basic unit is missing, stop immediately
-        if (!smallFlower || !smallFlower.complete) return;
-
-        // 3. Bitwise Math for integer division (faster than Math.floor)
+        // Bitwise Math for integer division (faster than Math.floor)
         const largeCount = (level / 10) | 0;
         const smallCount = level % 10;
 
         let xPos = CANVAS_WIDTH;
 
         // --- Draw Large Flowers ---
-        // Check existence once, not every loop iteration
         // Order: large_1 first (rightmost), then alternate large_2, large_1, large_2...
         // Since we draw right-to-left, we need to reverse the alternation pattern
         if (
             largeCount > 0 &&
-            largeFlower1?.complete &&
-            largeFlower2?.complete
+            this.sprites['flower_large_1'] &&
+            this.sprites['flower_large_2']
         ) {
             for (let i = 0; i < largeCount; i++) {
                 xPos -= size;
@@ -1275,16 +1166,17 @@ export class Renderer {
                 // Reverse index so large_1 is always first (rightmost)
                 // i=0 (rightmost) -> large_1, i=1 -> large_2, i=2 -> large_1, etc.
                 const reverseIndex = largeCount - 1 - i;
-                const img = reverseIndex & 1 ? largeFlower2 : largeFlower1;
+                const spriteName =
+                    reverseIndex & 1 ? 'flower_large_2' : 'flower_large_1';
 
-                ctx.drawImage(img, xPos, size, size, size);
+                this.drawSprite(spriteName, xPos, size, size, size);
             }
         }
 
         // --- Draw Small Flowers ---
         for (let i = 0; i < smallCount; i++) {
             xPos -= size;
-            ctx.drawImage(smallFlower, xPos, size, size, size);
+            this.drawSprite('flower_small', xPos, size, size, size);
         }
     }
 
