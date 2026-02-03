@@ -212,12 +212,11 @@ export class Renderer {
         }
 
         this.drawText(
-            '▶ 1 PLAYER',
+            '1 PLAYER',
             CANVAS_WIDTH / 2,
             CANVAS_HEIGHT / 2 + TILE_SIZE * 6,
             {
-                size: 8,
-                color: COLORS.TEXT_WHITE,
+                scale: 1,
                 align: 'center',
             }
         );
@@ -1072,18 +1071,17 @@ export class Renderer {
     }
 
     /**
-     * Draw UI elements (score, lives, level) with Press Start 2P font
+     * Draw UI elements (score, lives, level) using sprite text
      */
     drawUI(scoreManager, levelManager) {
         // Score (left)
         this.drawText('1UP', 4, 10, {
-            size: 6,
             color: COLORS.TEXT_RED,
+            scale: 1,
             align: 'left',
         });
         this.drawText(`${scoreManager.score}`.padStart(2, '0'), 4, 20, {
-            size: 8,
-            color: COLORS.TEXT_WHITE,
+            scale: 1,
             align: 'left',
         });
 
@@ -1108,8 +1106,8 @@ export class Renderer {
 
         // Hi-score (center)
         this.drawText('HI-SCORE', CANVAS_WIDTH / 2, 10, {
-            size: 6,
             color: COLORS.TEXT_RED,
+            scale: 1,
             align: 'center',
         });
         this.drawText(
@@ -1117,8 +1115,7 @@ export class Renderer {
             CANVAS_WIDTH / 2,
             20,
             {
-                size: 8,
-                color: COLORS.TEXT_WHITE,
+                scale: 1,
                 align: 'center',
             }
         );
@@ -1127,10 +1124,9 @@ export class Renderer {
         this.drawText(
             `ROUND ${levelManager.currentLevel}`,
             CANVAS_WIDTH - 4,
-            CANVAS_HEIGHT - TILE_SIZE / 2 + 4,
+            CANVAS_HEIGHT - TILE_SIZE / 2 + 3,
             {
-                size: 8,
-                color: COLORS.TEXT_WHITE,
+                scale: 1,
                 align: 'right',
             }
         );
@@ -1181,17 +1177,125 @@ export class Renderer {
     }
 
     /**
-     * Draw text with Press Start 2P font
+     * Get the sprite name for a character
+     * @param {string} char - Single character
+     * @returns {string|null} - Sprite name or null if not available
+     */
+    getLetterSprite(char) {
+        if (char >= '0' && char <= '9') return `letter_${char}`;
+        if (char >= 'A' && char <= 'Z') return `letter_${char}`;
+        if (char >= 'a' && char <= 'z') return `letter_${char.toUpperCase()}`;
+        if (char === '.') return 'letter_period';
+        if (char === '!') return 'letter_bang';
+        if (char === '-') return 'letter_hyphen';
+        if (char === "'") return 'letter_apostrophe';
+        if (char === '▶') return 'letter_caret_right';
+        if (char === '©') return 'letter_copy';
+        // Space and unsupported chars return null (will just add spacing)
+        return null;
+    }
+
+    getTintedSprite(image, color) {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = image.width;
+        offscreen.height = image.height;
+        const ctx = offscreen.getContext('2d');
+
+        // 1. Draw the original sprite
+        ctx.drawImage(image, 0, 0);
+
+        // 2. Overlay the color
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+
+        return offscreen;
+    }
+
+    /**
+     * Draw text using sprite letters from the spritesheet
+     * @param {string} text - Text to render
+     * @param {number} x - X position
+     * @param {number} y - Y position (top of text, unlike canvas which uses baseline)
+     * @param {Object} options - Rendering options
+     * @param {number} options.scale - Scale factor (default 1)
+     * @param {number} options.spacing - Extra spacing between letters (default 1)
+     * @param {string} options.align - 'left', 'center', or 'right' (default 'left')
+     * @param {string} options.color
      */
     drawText(text, x, y, options = {}) {
-        const size = options.size || 16;
-        const color = options.color || COLORS.TEXT_WHITE;
-        const align = options.align || 'left';
+        if (!this.spritesLoaded || !this.spritesheet) return;
 
-        this.ctx.font = `${size}px "Press Start 2P", "Courier New", monospace`;
-        this.ctx.fillStyle = color;
-        this.ctx.textAlign = align;
-        this.ctx.fillText(text, x, y);
+        let sheet = this.spritesheet;
+        const scale = options.scale ?? 1;
+        const spacing = options.spacing ?? 1;
+        const align = options.align ?? 'left';
+
+        if (options.color) {
+            sheet = this.getTintedSprite(sheet, options.color);
+        }
+
+        // Calculate total width for alignment
+        let totalWidth = 0;
+        for (const char of text) {
+            if (char === ' ') {
+                totalWidth += 5 * scale + spacing; // Space width
+            } else {
+                const spriteName = this.getLetterSprite(char);
+                const sprite = spriteName ? this.sprites[spriteName] : null;
+                if (sprite) {
+                    totalWidth += sprite.width * scale + spacing;
+                } else {
+                    // Unknown char - use default width
+                    totalWidth += 7 * scale + spacing;
+                }
+            }
+        }
+        // Remove trailing spacing
+        totalWidth -= spacing;
+
+        // Adjust starting X based on alignment
+        let drawX = x;
+        if (align === 'center') drawX = x - totalWidth / 2;
+        else if (align === 'right') drawX = x - totalWidth;
+
+        // Adjust Y to account for the difference between canvas text baseline and sprite top
+        // The original drawText used baseline positioning, sprites use top-left
+        // Approximate adjustment based on typical font size to sprite size ratio
+        const adjustedY = y - 7 * scale;
+
+        // Draw each character
+        for (const char of text) {
+            if (char === ' ') {
+                drawX += 5 * scale + spacing;
+                continue;
+            }
+
+            const spriteName = this.getLetterSprite(char);
+            const sprite = spriteName ? this.sprites[spriteName] : null;
+
+            if (sprite) {
+                const drawWidth = sprite.width * scale;
+                const drawHeight = sprite.height * scale;
+
+                this.ctx.drawImage(
+                    sheet,
+                    sprite.x,
+                    sprite.y,
+                    sprite.width,
+                    sprite.height,
+                    Math.round(drawX),
+                    Math.round(adjustedY),
+                    drawWidth,
+                    drawHeight
+                );
+
+                drawX += drawWidth + spacing;
+            } else {
+                // Unknown char - skip with default width
+                drawX += 7 * scale + spacing;
+            }
+        }
     }
 
     /**
@@ -1203,20 +1307,19 @@ export class Renderer {
         this.drawText(
             'PLAYER 1',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - TILE_SIZE / 2 - 2,
+            CANVAS_HEIGHT / 2 - TILE_SIZE / 2 - 3,
             {
-                size: 10,
-                color: COLORS.TEXT_WHITE,
+                scale: 1,
                 align: 'center',
             }
         );
+        // Note: Exclamation mark not available in sprite font, using "READY" instead
         this.drawText(
             'READY!',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + TILE_SIZE + 5,
+            CANVAS_HEIGHT / 2 + TILE_SIZE + 3,
             {
-                size: 10,
-                color: COLORS.TEXT_WHITE,
+                scale: 1,
                 align: 'center',
             }
         );

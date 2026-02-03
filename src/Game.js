@@ -2,7 +2,6 @@ import {
     CANVAS_WIDTH,
     CANVAS_HEIGHT,
     GAME_STATES,
-    COLORS,
     DEATH,
     TILE_SIZE,
     ENEMY_TYPES,
@@ -973,8 +972,7 @@ export class Game {
 
         this.render();
         this.renderer.drawText('PAUSED', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, {
-            size: 16,
-            color: COLORS.TEXT_WHITE,
+            scale: 2,
             align: 'center',
         });
     }
@@ -993,12 +991,11 @@ export class Game {
     renderLevelComplete() {
         this.render();
         this.renderer.drawText(
-            `LEVEL ${this.levelManager.currentLevel} `,
+            `LEVEL ${this.levelManager.currentLevel}`,
             CANVAS_WIDTH / 2,
             CANVAS_HEIGHT / 2 - TILE_SIZE / 2 - 2,
             {
-                size: 10,
-                color: COLORS.TEXT_WHITE,
+                scale: 1,
                 align: 'center',
             }
         );
@@ -1007,8 +1004,7 @@ export class Game {
             CANVAS_WIDTH / 2,
             CANVAS_HEIGHT / 2 + TILE_SIZE + 5,
             {
-                size: 10,
-                color: COLORS.TEXT_WHITE,
+                scale: 1,
                 align: 'center',
             }
         );
@@ -1027,8 +1023,7 @@ export class Game {
             CANVAS_WIDTH / 2,
             CANVAS_HEIGHT / 2,
             {
-                size: 16,
-                color: COLORS.TEXT_WHITE,
+                scale: 2,
                 align: 'center',
             }
         );
