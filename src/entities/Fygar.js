@@ -72,57 +72,55 @@ export class Fygar extends Enemy {
      * Update fire breath state machine
      */
     updateFireBreath(deltaTime, player, grid) {
-        // Update cooldown timer
-        if (this.fireState === 'cooldown') {
+        const state = this.fireState;
+
+        // 1. Cooldown
+        if (state === 'cooldown') {
             this.fireCooldownTimer += deltaTime;
             if (this.fireCooldownTimer >= ENEMY.FYGAR.FIRE_COOLDOWN) {
                 this.fireState = 'ready';
                 this.fireCooldownTimer = 0;
+                this.fireDirection = null;
             }
             return;
         }
 
-        // Ready state - check if we should start charging
-        if (this.fireState === 'ready') {
-            // Only fire when facing horizontally
-            if (
-                this.direction !== DIRECTIONS.LEFT &&
-                this.direction !== DIRECTIONS.RIGHT
-            ) {
-                return;
-            }
+        // 2. Ready State (Decision making)
+        if (state === 'ready') {
+            const dir = this.direction;
 
-            // Check if player is in fire range and horizontally aligned
-            // Also verify there's no dirt blocking the fire path
-            if (
-                ((this.direction === DIRECTIONS.RIGHT && this.x < player.x) ||
-                    (this.direction === DIRECTIONS.LEFT &&
-                        this.x > player.x)) &&
-                this.isPlayerInFireRange(player, grid)
-            ) {
+            // Fast exit: Can only fire if horizontal
+            if (dir !== DIRECTIONS.LEFT && dir !== DIRECTIONS.RIGHT) return;
+
+            // Optimization: Simple X check before expensive range checks
+            const isFacingRight = dir === DIRECTIONS.RIGHT;
+
+            // If facing right, player MUST be to the right (x > x).
+            // If facing left, player MUST be to the left (x < x).
+            // This acts as a "Guard Clause" to skip the heavy isPlayerInFireRange logic.
+            if (isFacingRight ? player.x <= this.x : player.x >= this.x) return;
+
+            // Now perform the strict grid/range check
+            if (this.isPlayerInFireRange(player, grid)) {
+                this.fireDirection = dir; // Lock direction
                 this.startCharging();
             }
             return;
         }
 
-        // Charging state - pause before firing
-        if (this.fireState === 'charging') {
-            this.fireStateTimer += deltaTime;
+        // 3. Charging / Firing (Execution)
+        // We increment the timer for both states here to avoid duplicate code
+        this.fireStateTimer += deltaTime;
+
+        if (state === 'charging') {
             if (this.fireStateTimer >= ENEMY.FYGAR.FIRE_CHARGE_TIME) {
                 this.startFiring();
             }
-            return;
-        }
-
-        // Firing state - fire is active
-        if (this.fireState === 'firing') {
-            this.fireStateTimer += deltaTime;
-            // Recalculate hitbox each frame as fire extends
+        } else if (state === 'firing') {
             this.calculateFireHitbox();
             if (this.fireStateTimer >= ENEMY.FYGAR.FIRE_DURATION) {
                 this.stopFiring();
             }
-            return;
         }
     }
 
@@ -176,17 +174,14 @@ export class Fygar extends Enemy {
     startCharging() {
         this.fireState = 'charging';
         this.fireStateTimer = 0;
-        this.fireDirection = this.direction; // Lock fire direction
-        this.isMoving = false; // Stop moving while charging/firing
+        this.isMoving = false;
 
-        // Snap to grid based on center point (same as movement system uses)
-        // Use floor to avoid jumping forward
+        // The Snap (This is where the X/Y changes)
         const gx = Math.floor((this.x + TILE_SIZE / 2) / TILE_SIZE);
         const gy = Math.floor((this.y + TILE_SIZE / 2) / TILE_SIZE);
         this.x = gx * TILE_SIZE;
         this.y = gy * TILE_SIZE;
 
-        // Sync grid tracking
         this.lastGridX = gx;
         this.lastGridY = gy;
     }
@@ -289,7 +284,7 @@ export class Fygar extends Enemy {
      * Get fire direction for rendering
      */
     getFireDirection() {
-        return this.fireDirection;
+        return this.fireDirection || this.direction;
     }
 
     /**

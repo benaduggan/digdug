@@ -820,16 +820,15 @@ export class Renderer {
     drawEnemy(enemy) {
         if (!this.spritesLoaded) return;
 
-        const px = enemy.x;
-        const py = enemy.y;
-        const centerX = px + TILE_SIZE / 2;
-        const centerY = py + TILE_SIZE / 2;
+        // Optimization: Bitwise OR 0 truncates decimals faster than Math.floor
+        // and ensures we don't render on sub-pixels (blurry edges).
+        const centerX = (enemy.x + TILE_SIZE / 2) | 0;
+        const centerY = (enemy.y + TILE_SIZE / 2) | 0;
 
-        // Handle smooshed state (crushed by rock)
+        // 1. Smooshed
         if (enemy.isSmooshed) {
-            const spriteName = `${enemy.type}_smooshed`;
             this.drawSpriteCentered(
-                spriteName,
+                `${enemy.type}_smooshed`,
                 centerX,
                 centerY,
                 enemy.spriteFlipH
@@ -837,11 +836,10 @@ export class Renderer {
             return;
         }
 
-        // Handle popped state (after full inflation)
+        // 2. Popped
         if (enemy.isPopped) {
-            const spriteName = `${enemy.type}_popped`;
             this.drawSpriteCentered(
-                spriteName,
+                `${enemy.type}_popped`,
                 centerX,
                 centerY,
                 enemy.spriteFlipH
@@ -849,23 +847,17 @@ export class Renderer {
             return;
         }
 
-        // Handle inflating state (being pumped)
+        // 3. Inflating
         if (enemy.inflateLevel > 1.0) {
-            // inflateLevel goes from 1.0 to 2.0
-            // Map to sprite stages: 1.0-1.33 = stage 1, 1.33-1.66 = stage 2, 1.66-2.0 = stage 3
-            const inflateProgress = (enemy.inflateLevel - 1.0) / 1.0; // 0 to 1
-            let stage;
-            if (inflateProgress < 0.33) {
-                stage = 1;
-            } else if (inflateProgress < 0.66) {
-                stage = 2;
-            } else {
-                stage = 3;
-            }
+            // Optimization: Map 1.0-2.0 range to integers 1, 2, 3 using math
+            // instead of multiple if/else branches.
+            let stage = Math.floor((enemy.inflateLevel - 1.0) * 3) + 1;
+            // Clamp to ensure we never ask for stage 4 or 0 due to float rounding
+            if (stage > 3) stage = 3;
+            if (stage < 1) stage = 1;
 
-            const spriteName = `${enemy.type}_inflating_${stage}`;
             this.drawSpriteCentered(
-                spriteName,
+                `${enemy.type}_inflating_${stage}`,
                 centerX,
                 centerY,
                 enemy.spriteFlipH
@@ -873,22 +865,35 @@ export class Renderer {
             return;
         }
 
-        // Normal state - use walking/ghosting sprites
+        // 4. Normal Walking / Ghosting / Fire Logic
         const frameNumber = enemy.animationFrame === 0 ? '1' : '2';
         const state = enemy.isGhosting ? 'ghosting' : 'walking';
-        const spriteName = `${enemy.type}_${state}_${frameNumber}`;
+
+        // Default flip based on movement
+        let renderFlip = enemy.spriteFlipH;
+        const isFygar = enemy.type === ENEMY_TYPES.FYGAR;
+
+        // FYGAR OVERRIDE:
+        // If locked in fire state, ignore movement flip and force fire direction.
+        // Direct boolean assignment is faster than if/else blocks.
+        if (isFygar && enemy.fireDirection) {
+            renderFlip = enemy.fireDirection === DIRECTIONS.RIGHT;
+        }
+
         this.drawSpriteCentered(
-            spriteName,
+            `${enemy.type}_${state}_${frameNumber}`,
             centerX,
             centerY,
-            enemy.spriteFlipH
+            renderFlip
         );
 
-        // Draw fire breath for Fygar
-        if (enemy.type === ENEMY_TYPES.FYGAR) {
-            if (enemy.isCharging && enemy.isCharging()) {
+        // 5. Fire Effects (Fygar only)
+        if (isFygar) {
+            // Check property directly instead of method call overhead
+            const fState = enemy.fireState;
+            if (fState === 'charging') {
                 this.drawFygarCharging(enemy);
-            } else if (enemy.isFireActive && enemy.isFireActive()) {
+            } else if (fState === 'firing') {
                 this.drawFygarFire(enemy);
             }
         }
