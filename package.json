@@ -1,6 +1,6 @@
 {
     "name": "taizo-hori",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "description": "An updated recreation of the classic 1982 Dig Dug arcade game using vanilla JavaScript and HTML5 Canvas",
     "keywords": [
         "digdug",
