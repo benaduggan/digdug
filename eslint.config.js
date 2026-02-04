@@ -3,11 +3,14 @@ import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 
 export default [
+    // Global ignores must be in a separate config object
+    {
+        ignores: ['node_modules/**', 'dist/**', '*.config.js'],
+    },
     // Apply settings to all Javascript files
     js.configs.recommended,
     prettier,
     {
-        ignores: ['node_modules/', 'dist/', '*.config.js'],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'module',

@@ -10,6 +10,8 @@ import {
 } from './utils/constants.js';
 import { loadImage } from './utils/loadImage.js';
 import { getDirtGradient } from './utils/dirtGradient.js';
+import spriteMapData from './utils/sprite_map.json';
+import spritesheetUrl from '../assets/sprites/spritesheet.png';
 
 export class Renderer {
     constructor(config) {
@@ -47,6 +49,11 @@ export class Renderer {
         this.backgroundCtx.imageSmoothingEnabled = false;
         this.backgroundDirty = true; // Flag to rebuild background when grid changes
         this.lastGridState = null; // Track grid state to detect changes
+
+        // Menu animation state
+        this.menuAnimationStartTime = null;
+        this.menuAnimationDuration = 3000; // 3 seconds to slide up
+        this.menuAnimationComplete = false;
     }
 
     /**
@@ -54,18 +61,12 @@ export class Renderer {
      */
     async loadSprites() {
         try {
-            // Load spritesheet image and sprite map JSON in parallel
-            const [spritesheetImg, spriteMapResponse] = await Promise.all([
-                loadImage('/assets/sprites/spritesheet.png'),
-                fetch('/src/utils/sprite_map.json'),
-            ]);
+            // Load spritesheet image using the imported URL (bundled by Vite)
+            this.spritesheet = await loadImage(spritesheetUrl);
 
-            this.spritesheet = spritesheetImg;
-            const spriteMapArray = await spriteMapResponse.json();
-
-            // Convert array to lookup object by name
+            // Convert imported sprite map array to lookup object by name
             this.sprites = {};
-            spriteMapArray.forEach((sprite) => {
+            spriteMapData.forEach((sprite) => {
                 this.sprites[sprite.name] = sprite;
             });
 
@@ -193,11 +194,61 @@ export class Renderer {
         container.appendChild(this.canvas);
     }
 
+    /**
+     * Start the menu slide-up animation
+     */
+    startMenuAnimation() {
+        this.menuAnimationStartTime = performance.now();
+        this.menuAnimationComplete = false;
+    }
+
+    /**
+     * Skip the menu animation and show the final state
+     */
+    skipMenuAnimation() {
+        this.menuAnimationComplete = true;
+    }
+
+    /**
+     * Reset menu animation state (call when leaving menu)
+     */
+    resetMenuAnimation() {
+        this.menuAnimationStartTime = null;
+        this.menuAnimationComplete = false;
+    }
+
+    /**
+     * Check if menu animation is still playing
+     */
+    isMenuAnimating() {
+        return (
+            this.menuAnimationStartTime !== null && !this.menuAnimationComplete
+        );
+    }
+
     drawMenu(scoreManager) {
         const { ctx, sprites, spritesheet, spritesLoaded } = this;
         if (!spritesLoaded || !spritesheet) return;
 
-        this.drawHiScore(scoreManager);
+        // Calculate animation offset
+        let offsetY = 0;
+        if (
+            this.menuAnimationStartTime !== null &&
+            !this.menuAnimationComplete
+        ) {
+            const elapsed = performance.now() - this.menuAnimationStartTime;
+            const progress = Math.min(1, elapsed / this.menuAnimationDuration);
+
+            // Linear animation
+            offsetY = CANVAS_HEIGHT * (1 - progress);
+
+            if (progress >= 1) {
+                this.menuAnimationComplete = true;
+                offsetY = 0;
+            }
+        }
+
+        this.drawHiScore(scoreManager, offsetY);
 
         /**
          * Helper to reduce repetitive logic and ensure whole-pixel rendering
@@ -214,7 +265,7 @@ export class Renderer {
                 s.width,
                 s.height, // Source
                 dx | 0,
-                dy | 0,
+                (dy + offsetY) | 0,
                 s.width,
                 s.height // Destination
             );
@@ -239,15 +290,22 @@ export class Renderer {
         if (enemies)
             draw('enemies', CANVAS_WIDTH - enemies.width - sideMargin, charY);
 
-        this.drawText(
-            '▶ 1 PLAYER',
-            (CANVAS_WIDTH / 2) | 0,
-            (CANVAS_HEIGHT * 0.8) | 0,
-            {
+        // Draw "1 PLAYER" text (always visible)
+        const playerTextY = ((CANVAS_HEIGHT * 0.8) | 0) + offsetY;
+        this.drawText('1 PLAYER', (CANVAS_WIDTH / 2) | 0, playerTextY, {
+            scale: 1,
+            align: 'center',
+        });
+
+        // Draw flashing "▶" character (flashes every 500ms)
+        const caretVisible = Math.floor(performance.now() / 500) % 2 === 0;
+        if (caretVisible) {
+            const caretX = ((CANVAS_WIDTH / 2) | 0) - 40;
+            this.drawText('▶', caretX, playerTextY, {
                 scale: 1,
-                align: 'center',
-            }
-        );
+                align: 'left',
+            });
+        }
 
         // Namco Logo & Copyright
         const namco = sprites['namco'];
@@ -257,7 +315,7 @@ export class Renderer {
         this.drawText(
             '© 1982 NAMCO LTD.',
             (CANVAS_WIDTH / 2) | 0,
-            (CANVAS_HEIGHT - 5) | 0,
+            ((CANVAS_HEIGHT - 5) | 0) + offsetY,
             {
                 scale: 1,
                 align: 'center',
@@ -1145,9 +1203,9 @@ export class Renderer {
         this.drawLevelIndicators(levelManager.currentLevel);
     }
 
-    drawHiScore(scoreManager) {
+    drawHiScore(scoreManager, offsetY = 0) {
         // Hi-score (center)
-        this.drawText('HI-SCORE', CANVAS_WIDTH / 2, 10, {
+        this.drawText('HI-SCORE', CANVAS_WIDTH / 2, 10 + offsetY, {
             color: COLORS.TEXT_RED,
             scale: 1,
             align: 'center',
@@ -1155,7 +1213,7 @@ export class Renderer {
         this.drawText(
             `${scoreManager.highScore}`.padStart(2, '0'),
             CANVAS_WIDTH / 2,
-            20,
+            20 + offsetY,
             {
                 scale: 1,
                 align: 'center',

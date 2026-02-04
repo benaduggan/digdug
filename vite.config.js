@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { copyFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 
 export default defineConfig({
@@ -24,5 +25,16 @@ export default defineConfig({
         },
         sourcemap: true,
         minify: 'terser', // Smaller bundle size for production
+        // Inline assets smaller than 100KB (covers the 15KB spritesheet)
+        assetsInlineLimit: 100000,
     },
+    plugins: [
+        {
+            name: 'copy-dts',
+            closeBundle() {
+                // Copy TypeScript definitions to dist
+                copyFileSync('src/index.d.ts', 'dist/index.d.ts');
+            },
+        },
+    ],
 });

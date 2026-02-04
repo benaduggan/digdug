@@ -87,8 +87,27 @@ export class Game {
      */
     showMenu() {
         this.state = GAME_STATES.MENU;
-        this.renderer.clear();
-        this.renderer.drawMenu(this.scoreManager);
+
+        // Start the menu slide-up animation
+        this.renderer.startMenuAnimation();
+
+        // Start menu animation loop
+        this.menuAnimationFrameId = null;
+        const menuLoop = () => {
+            if (this.state !== GAME_STATES.MENU) {
+                this.renderer.resetMenuAnimation();
+                return;
+            }
+
+            this.renderer.forceClear();
+            this.renderer.drawMenu(this.scoreManager);
+
+            // Continue loop if animation is still playing or menu is showing
+            if (this.state === GAME_STATES.MENU) {
+                this.menuAnimationFrameId = requestAnimationFrame(menuLoop);
+            }
+        };
+        menuLoop();
 
         // Wait for space key (only set up listener once)
         if (!this.menuListenerAdded) {
@@ -98,8 +117,21 @@ export class Game {
                     (e.code === 'Space' || e.code === 'Enter') &&
                     this.state === GAME_STATES.MENU
                 ) {
+                    // If animation is playing, skip it first
+                    if (this.renderer.isMenuAnimating()) {
+                        this.renderer.skipMenuAnimation();
+                        return; // Don't start game yet, wait for another press
+                    }
+
+                    // Cancel menu animation loop
+                    if (this.menuAnimationFrameId) {
+                        cancelAnimationFrame(this.menuAnimationFrameId);
+                        this.menuAnimationFrameId = null;
+                    }
+
                     document.removeEventListener('keydown', startGame);
                     this.menuListenerAdded = false;
+                    this.renderer.resetMenuAnimation();
                     this.startGame();
                 }
             };

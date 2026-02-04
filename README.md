@@ -1,5 +1,10 @@
 # Dig Dug
 
+[![npm version](https://img.shields.io/npm/v/taizo-hori.svg)](https://www.npmjs.com/package/taizo-hori)
+[![npm downloads](https://img.shields.io/npm/dm/taizo-hori.svg)](https://www.npmjs.com/package/taizo-hori)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/taizo-hori)](https://bundlephobia.com/package/taizo-hori)
+[![license](https://img.shields.io/npm/l/taizo-hori.svg)](https://github.com/IanSmith89/digdug/blob/main/LICENSE)
+
 A faithful recreation of the classic 1982 Dig Dug arcade game using vanilla JavaScript and HTML5 Canvas.
 
 ## Features
@@ -40,6 +45,46 @@ const game = new DigDug({
 game.start();
 ```
 
+### Via CDN (UMD)
+
+Use the library directly in the browser without npm:
+
+```html
+<!-- unpkg -->
+<script src="https://unpkg.com/taizo-hori/dist/digdug.umd.js"></script>
+
+<!-- or jsDelivr -->
+<script src="https://cdn.jsdelivr.net/npm/taizo-hori/dist/digdug.umd.js"></script>
+
+<div id="game"></div>
+<script>
+    const game = new DigDug({
+        container: document.getElementById('game'),
+        scale: 2,
+    });
+    game.start();
+</script>
+```
+
+### TypeScript
+
+This package includes TypeScript type definitions:
+
+```typescript
+import DigDug, { GameConfig, GameState } from 'taizo-hori';
+
+const config: GameConfig = {
+    container: document.getElementById('game')!,
+    scale: 2,
+    onGameOver: (score: number) => {
+        console.log(`Final score: ${score}`);
+    },
+};
+
+const game = new DigDug(config);
+await game.start();
+```
+
 ### Configuration Options
 
 - `container` (HTMLElement, required): DOM element to attach the game canvas
@@ -50,6 +95,27 @@ game.start();
 - `onGameOver` (function): Callback when game ends
 - `onLevelComplete` (function): Callback when level is completed
 - `onScoreChange` (function): Callback when score changes
+
+## API Reference
+
+### Methods
+
+| Method     | Returns         | Description                   |
+| ---------- | --------------- | ----------------------------- |
+| `start()`  | `Promise<void>` | Initialize and start the game |
+| `stop()`   | `void`          | Stop the game and cleanup     |
+| `pause()`  | `void`          | Pause gameplay                |
+| `resume()` | `void`          | Resume gameplay               |
+
+### Properties
+
+| Property | Type        | Description        |
+| -------- | ----------- | ------------------ |
+| `state`  | `GameState` | Current game state |
+
+### GameState
+
+One of: `'menu'` | `'intro'` | `'playing'` | `'paused'` | `'dying'` | `'respawning'` | `'level_complete'` | `'game_over'`
 
 ## Controls
 
