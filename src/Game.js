@@ -1044,18 +1044,18 @@ export class Game {
         this.renderer.drawText(
             `LEVEL ${this.levelManager.currentLevel}`,
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - 5,
+            CANVAS_HEIGHT / 2 - 10,
             {
-                scale: 1,
+                scale: 2,
                 align: 'center',
             }
         );
         this.renderer.drawText(
-            'COMPLETE',
+            'COMPLETE!',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 5,
+            CANVAS_HEIGHT / 2 + 10,
             {
-                scale: 1,
+                scale: 2,
                 align: 'center',
             }
         );
@@ -1070,9 +1070,18 @@ export class Game {
 
         // Overlay "GAME OVER" text
         this.renderer.drawText(
-            'GAME OVER',
+            'GAME',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2,
+            CANVAS_HEIGHT / 2 - 10,
+            {
+                scale: 2,
+                align: 'center',
+            }
+        );
+        this.renderer.drawText(
+            'OVER',
+            CANVAS_WIDTH / 2,
+            CANVAS_HEIGHT / 2 + 24,
             {
                 scale: 2,
                 align: 'center',
