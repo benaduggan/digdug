@@ -63,6 +63,10 @@ export class Game {
         // Track dirt count for dig scoring
         this.lastDirtCount = 0;
 
+        // Level complete timer
+        this.levelCompleteTimer = 0;
+        this.LEVEL_COMPLETE_DELAY = 2000; // 2 seconds before next level
+
         // Bind methods
         this.gameLoop = this.gameLoop.bind(this);
     }
@@ -287,6 +291,7 @@ export class Game {
                 this.renderPaused();
                 break;
             case GAME_STATES.LEVEL_COMPLETE:
+                this.updateLevelComplete(deltaTime);
                 this.renderLevelComplete();
                 break;
             case GAME_STATES.GAME_OVER:
@@ -936,14 +941,21 @@ export class Game {
      */
     levelComplete() {
         this.state = GAME_STATES.LEVEL_COMPLETE;
-        const nextLevel = this.levelManager.currentLevel + 1;
-        this.config.onLevelComplete(nextLevel - 1);
+        this.levelCompleteTimer = 0;
+        this.config.onLevelComplete(this.levelManager.currentLevel);
+    }
 
-        // Wait 2 seconds then start next level
-        setTimeout(() => {
+    /**
+     * Update level complete state
+     */
+    updateLevelComplete(deltaTime) {
+        this.levelCompleteTimer += deltaTime;
+
+        if (this.levelCompleteTimer >= this.LEVEL_COMPLETE_DELAY) {
+            const nextLevel = this.levelManager.currentLevel + 1;
             this.startLevel(nextLevel);
             this.state = GAME_STATES.PLAYING;
-        }, 2000);
+        }
     }
 
     /**
@@ -1052,7 +1064,7 @@ export class Game {
             }
         );
         this.renderer.drawText(
-            'COMPLETE!',
+            'COMPLETE',
             CANVAS_WIDTH / 2,
             CANVAS_HEIGHT / 2 + 10,
             {
@@ -1069,32 +1081,35 @@ export class Game {
         // Render the game state underneath (like pause screen)
         this.render();
 
-        // Overlay "GAME OVER" text
-        this.renderer.drawText(
-            'GAME',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 - 10,
-            {
-                scale: 2,
-                align: 'center',
-            }
-        );
-        this.renderer.drawText(
-            'OVER',
-            CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + 24,
-            {
-                scale: 2,
-                align: 'center',
-            }
-        );
+        // Flash "GAME OVER" text
+        const textVisible = Math.floor(performance.now() / 750) % 2 === 0;
+        if (textVisible) {
+            this.renderer.drawText(
+                'GAME',
+                CANVAS_WIDTH / 2,
+                CANVAS_HEIGHT / 2 - 10,
+                {
+                    scale: 2,
+                    align: 'center',
+                }
+            );
+            this.renderer.drawText(
+                'OVER',
+                CANVAS_WIDTH / 2,
+                CANVAS_HEIGHT / 2 + 24,
+                {
+                    scale: 2,
+                    align: 'center',
+                }
+            );
+        }
 
         // Check if space is pressed to return to menu (only set up listener once)
         if (!this.restartListenerAdded) {
             this.restartListenerAdded = true;
             const returnToMenu = (e) => {
                 if (
-                    e.code === 'Space' &&
+                    (e.code === 'Space' || e.code === 'Enter') &&
                     this.state === GAME_STATES.GAME_OVER
                 ) {
                     document.removeEventListener('keydown', returnToMenu);

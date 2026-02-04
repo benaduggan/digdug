@@ -54,6 +54,16 @@ export class Renderer {
         this.menuAnimationStartTime = null;
         this.menuAnimationDuration = 3000; // 3 seconds to slide up
         this.menuAnimationComplete = false;
+
+        // Pre-allocated reusable object for color calculations (avoids GC pressure)
+        this._colorResult = { h: 0, s: 0, l: 0 };
+
+        // HSL string cache to avoid repeated string building
+        this._hslCache = new Map();
+        this._hslCacheMaxSize = 256;
+
+        // Tinted sprite cache
+        this._tintedSpriteCache = new Map();
     }
 
     /**
@@ -77,6 +87,45 @@ export class Renderer {
     }
 
     /**
+     * Internal helper for sprite drawing with flipping
+     * @private
+     */
+    _drawSpriteInternal(sprite, x, y, w, h, flipH, flipV) {
+        const ctx = this.ctx;
+        const sheet = this.spritesheet;
+
+        if (flipH || flipV) {
+            ctx.save();
+            ctx.translate(x + w / 2, y + h / 2);
+            ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+            ctx.drawImage(
+                sheet,
+                sprite.x,
+                sprite.y,
+                sprite.width,
+                sprite.height,
+                -w / 2,
+                -h / 2,
+                w,
+                h
+            );
+            ctx.restore();
+        } else {
+            ctx.drawImage(
+                sheet,
+                sprite.x,
+                sprite.y,
+                sprite.width,
+                sprite.height,
+                x,
+                y,
+                w,
+                h
+            );
+        }
+    }
+
+    /**
      * Draw a sprite from the spritesheet
      * @param {string} name - Sprite name from sprite_map.json
      * @param {number} x - X position to draw at
@@ -96,44 +145,20 @@ export class Renderer {
         flipH = false,
         flipV = false
     ) {
-        if (!this.spritesLoaded || !this.spritesheet) return false;
+        if (!this.spritesLoaded) return false;
 
         const sprite = this.sprites[name];
         if (!sprite) return false;
 
-        // Use sprite's natural size if not specified
-        const drawWidth = width ?? sprite.width;
-        const drawHeight = height ?? sprite.height;
-
-        if (flipH || flipV) {
-            this.ctx.save();
-            this.ctx.translate(x + drawWidth / 2, y + drawHeight / 2);
-            this.ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-            this.ctx.drawImage(
-                this.spritesheet,
-                sprite.x,
-                sprite.y,
-                sprite.width,
-                sprite.height,
-                -drawWidth / 2,
-                -drawHeight / 2,
-                drawWidth,
-                drawHeight
-            );
-            this.ctx.restore();
-        } else {
-            this.ctx.drawImage(
-                this.spritesheet,
-                sprite.x,
-                sprite.y,
-                sprite.width,
-                sprite.height,
-                x,
-                y,
-                drawWidth,
-                drawHeight
-            );
-        }
+        this._drawSpriteInternal(
+            sprite,
+            x,
+            y,
+            width ?? sprite.width,
+            height ?? sprite.height,
+            flipH,
+            flipV
+        );
         return true;
     }
 
@@ -147,43 +172,22 @@ export class Renderer {
      * @returns {boolean} - Whether the sprite was drawn successfully
      */
     drawSpriteCentered(name, centerX, centerY, flipH = false, flipV = false) {
-        if (!this.spritesLoaded || !this.spritesheet) return false;
+        if (!this.spritesLoaded) return false;
 
         const sprite = this.sprites[name];
         if (!sprite) return false;
 
-        const x = centerX - sprite.width / 2;
-        const y = centerY - sprite.height / 2;
-
-        if (flipH || flipV) {
-            this.ctx.save();
-            this.ctx.translate(centerX, centerY);
-            this.ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-            this.ctx.drawImage(
-                this.spritesheet,
-                sprite.x,
-                sprite.y,
-                sprite.width,
-                sprite.height,
-                -sprite.width / 2,
-                -sprite.height / 2,
-                sprite.width,
-                sprite.height
-            );
-            this.ctx.restore();
-        } else {
-            this.ctx.drawImage(
-                this.spritesheet,
-                sprite.x,
-                sprite.y,
-                sprite.width,
-                sprite.height,
-                x,
-                y,
-                sprite.width,
-                sprite.height
-            );
-        }
+        const halfW = sprite.width / 2;
+        const halfH = sprite.height / 2;
+        this._drawSpriteInternal(
+            sprite,
+            centerX - halfW,
+            centerY - halfH,
+            sprite.width,
+            sprite.height,
+            flipH,
+            flipV
+        );
         return true;
     }
 
@@ -376,30 +380,68 @@ export class Renderer {
     /**
      * Get neighbor info for an empty tile
      * Returns object with booleans for each direction that borders dirt/rock
+     * OPTIMIZED: Inline checks, reuse result object
      */
     getEmptyTileNeighbors(grid, x, y) {
         const bottomUIRow = grid.height - 1;
-        // Treat bottom UI row as "solid" so tunnels above it render bottom edges
-        const isNeighborDirt = (nx, ny) => {
-            if (ny === bottomUIRow) return true; // Bottom UI row acts as solid for edge rendering
-            return !grid.isEmpty(nx, ny);
-        };
+        const yAbove = y - 1;
+        const yBelow = y + 1;
+        const xLeft = x - 1;
+        const xRight = x + 1;
+        const notSky = y > 1;
+
+        // Inline the dirt check: bottom UI row acts as solid, otherwise check isEmpty
+        const topDirt =
+            notSky && (yAbove === bottomUIRow || !grid.isEmpty(x, yAbove));
+        const bottomDirt = yBelow === bottomUIRow || !grid.isEmpty(x, yBelow);
+        const leftDirt = !grid.isEmpty(xLeft, y);
+        const rightDirt = !grid.isEmpty(xRight, y);
+
         return {
-            top: isNeighborDirt(x, y - 1) && y > 1, // y > 1 to exclude sky
-            bottom: isNeighborDirt(x, y + 1),
-            left: isNeighborDirt(x - 1, y),
-            right: isNeighborDirt(x + 1, y),
+            top: topDirt,
+            bottom: bottomDirt,
+            left: leftDirt,
+            right: rightDirt,
             // Diagonals for corner detection
-            topLeft: isNeighborDirt(x - 1, y - 1) && y > 1,
-            topRight: isNeighborDirt(x + 1, y - 1) && y > 1,
-            bottomLeft: isNeighborDirt(x - 1, y + 1),
-            bottomRight: isNeighborDirt(x + 1, y + 1),
+            topLeft:
+                notSky &&
+                (yAbove === bottomUIRow || !grid.isEmpty(xLeft, yAbove)),
+            topRight:
+                notSky &&
+                (yAbove === bottomUIRow || !grid.isEmpty(xRight, yAbove)),
+            bottomLeft: yBelow === bottomUIRow || !grid.isEmpty(xLeft, yBelow),
+            bottomRight:
+                yBelow === bottomUIRow || !grid.isEmpty(xRight, yBelow),
         };
+    }
+
+    /**
+     * Get HSL string from cache or build it
+     * @param {number} h - Hue
+     * @param {number} s - Saturation
+     * @param {number} l - Lightness
+     * @returns {string} - HSL color string
+     */
+    _getHslString(h, s, l) {
+        // Pack h, s, l into a single key (h is 0-360, s and l are 0-100)
+        const key = (h << 14) | (s << 7) | l;
+        let cached = this._hslCache.get(key);
+        if (cached === undefined) {
+            cached = `hsl(${h}, ${s}%, ${l}%)`;
+            // Limit cache size
+            if (this._hslCache.size >= this._hslCacheMaxSize) {
+                // Clear oldest entries (simple strategy)
+                const firstKey = this._hslCache.keys().next().value;
+                this._hslCache.delete(firstKey);
+            }
+            this._hslCache.set(key, cached);
+        }
+        return cached;
     }
 
     getDirtColorHSL(ratio, currentLevel) {
         // Clamp ratio between 0 and 1
-        const r = Math.max(0, Math.min(1, ratio));
+        const r = ratio < 0 ? 0 : ratio > 1 ? 1 : ratio;
         const dirtGradient = getDirtGradient(currentLevel);
 
         // Find the two colors we are between (e.g., Light and Mid)
@@ -415,25 +457,35 @@ export class Renderer {
         }
 
         // Calculate how far we are between the two stops (0.0 to 1.0)
-        // e.g. if Stops are 0.33 and 0.66, and ratio is 0.5, mixPercent is ~0.5
         const range = upper.stop - lower.stop;
-        const mixPercent = (r - lower.stop) / range;
 
         // Linear Interpolation (Lerp) the H, S, and L values
         // Note: If Range is 0 (end of array), avoid divide by zero
-        if (range === 0) return upper.color;
-
-        return {
-            h: Math.round(
-                lower.color.h + (upper.color.h - lower.color.h) * mixPercent
-            ),
-            s: Math.round(
-                lower.color.s + (upper.color.s - lower.color.s) * mixPercent
-            ),
-            l: Math.round(
-                lower.color.l + (upper.color.l - lower.color.l) * mixPercent
-            ),
-        };
+        // Reuse pre-allocated object to avoid GC pressure
+        const result = this._colorResult;
+        if (range === 0) {
+            result.h = upper.color.h;
+            result.s = upper.color.s;
+            result.l = upper.color.l;
+        } else {
+            const mixPercent = (r - lower.stop) / range;
+            result.h =
+                (lower.color.h +
+                    (upper.color.h - lower.color.h) * mixPercent +
+                    0.5) |
+                0;
+            result.s =
+                (lower.color.s +
+                    (upper.color.s - lower.color.s) * mixPercent +
+                    0.5) |
+                0;
+            result.l =
+                (lower.color.l +
+                    (upper.color.l - lower.color.l) * mixPercent +
+                    0.5) |
+                0;
+        }
+        return result;
     }
 
     /**
@@ -441,9 +493,9 @@ export class Renderer {
      * OPTIMIZED: Batches all geometry into a single draw call
      */
     drawTunnelEdges(ctx, px, py, neighbors, depthRatio, currentLevel) {
-        // 1. Set style once
+        // 1. Set style once (using cached HSL string)
         const { h, s, l } = this.getDirtColorHSL(depthRatio, currentLevel);
-        ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
+        ctx.fillStyle = this._getHslString(h, s, l);
 
         // 2. Begin a single path for all pixels
         ctx.beginPath();
@@ -463,29 +515,34 @@ export class Renderer {
 
     /**
      * Adds uniform pixel rects to the current path
+     * OPTIMIZED: Uses numeric side codes and unrolled loops
      */
     addTunnelEdgePath(ctx, px, py, side) {
-        // We use local variables for loop limits to avoid property lookup overhead
         const size = TILE_SIZE;
-
+        // Unroll loops for common tile size of 16 (4 iterations)
         if (side === 'top') {
-            for (let dx = 0; dx < size; dx += 4) {
-                ctx.rect(px + dx + 1, py, 2, 1);
-            }
+            ctx.rect(px + 1, py, 2, 1);
+            ctx.rect(px + 5, py, 2, 1);
+            ctx.rect(px + 9, py, 2, 1);
+            ctx.rect(px + 13, py, 2, 1);
         } else if (side === 'bottom') {
             const yPos = py + size - 1;
-            for (let dx = 0; dx < size; dx += 4) {
-                ctx.rect(px + dx + 1, yPos, 2, 1);
-            }
+            ctx.rect(px + 1, yPos, 2, 1);
+            ctx.rect(px + 5, yPos, 2, 1);
+            ctx.rect(px + 9, yPos, 2, 1);
+            ctx.rect(px + 13, yPos, 2, 1);
         } else if (side === 'left') {
-            for (let dy = 0; dy < size; dy += 4) {
-                ctx.rect(px, py + dy + 1, 1, 2);
-            }
-        } else if (side === 'right') {
+            ctx.rect(px, py + 1, 1, 2);
+            ctx.rect(px, py + 5, 1, 2);
+            ctx.rect(px, py + 9, 1, 2);
+            ctx.rect(px, py + 13, 1, 2);
+        } else {
+            // right
             const xPos = px + size - 1;
-            for (let dy = 0; dy < size; dy += 4) {
-                ctx.rect(xPos, py + dy + 1, 1, 2);
-            }
+            ctx.rect(xPos, py + 1, 1, 2);
+            ctx.rect(xPos, py + 5, 1, 2);
+            ctx.rect(xPos, py + 9, 1, 2);
+            ctx.rect(xPos, py + 13, 1, 2);
         }
     }
 
@@ -553,69 +610,59 @@ export class Renderer {
                 if (tile === TILE_TYPES.DIRT || tile === TILE_TYPES.ROCK) {
                     const depthRatio = (y - 2) / (grid.height - 2);
 
-                    // 1. Get Calculated HSL
+                    // 1. Get Calculated HSL (reuses internal object)
                     const { h, s, l } = this.getDirtColorHSL(
                         depthRatio,
                         currentLevel
                     );
 
-                    // 2. Draw Base
-                    ctx.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
+                    // 2. Draw Base (using cached HSL string)
+                    ctx.fillStyle = this._getHslString(h, s, l);
                     ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
-                    // 3. Boost Saturation for Specs
+                    // 3. Boost Saturation for Specs (using cached HSL strings)
                     // Shadow: Darker (-15%) and Richer (+20% Saturation)
-                    const shadowColor = `hsl(${h}, ${Math.min(100, s + 20)}%, ${Math.max(0, l - 15)}%)`;
+                    const shadowS = s + 20 > 100 ? 100 : s + 20;
+                    const shadowL = l - 15 < 0 ? 0 : l - 15;
 
                     // Highlight: Brighter (+10%) and Richer (+10% Saturation)
-                    const lightColor = `hsl(${h}, ${Math.min(100, s + 10)}%, ${Math.min(100, l + 10)}%)`;
+                    const lightS = s + 10 > 100 ? 100 : s + 10;
+                    const lightL = l + 10 > 100 ? 100 : l + 10;
 
-                    // 4. Texture Loop (Spread out 4px grid)
-                    const STEP = 4;
-                    const SPEC_SIZE = 2; // 2x2 specs
+                    // Pre-compute base coordinates for this tile
+                    const baseX = x * TILE_SIZE;
+                    const baseY = y * TILE_SIZE;
 
+                    // 4. Texture Loop (Spread out 4px grid) - unrolled for 16x16 tile
                     // --- PASS 1: Saturated Shadows ---
-                    ctx.fillStyle = shadowColor;
-                    for (let dy = 0; dy < TILE_SIZE; dy += STEP) {
-                        for (let dx = 0; dx < TILE_SIZE; dx += STEP) {
-                            const seedX = x * TILE_SIZE + dx;
-                            const seedY = y * TILE_SIZE + dy;
+                    ctx.fillStyle = this._getHslString(h, shadowS, shadowL);
+                    for (let dy = 0; dy < TILE_SIZE; dy += 4) {
+                        const seedY = baseY + dy;
+                        for (let dx = 0; dx < TILE_SIZE; dx += 4) {
+                            const seedX = baseX + dx;
+                            // Simplified noise calculation
                             const noise =
-                                Math.abs(
-                                    Math.sin(seedX * 12.989 + seedY * 78.233) *
-                                        43758.545
-                                ) % 1;
-
-                            if (noise < 0.15) {
-                                ctx.fillRect(
-                                    px + dx + 1,
-                                    py + dy + 1,
-                                    SPEC_SIZE,
-                                    SPEC_SIZE
-                                );
+                                (Math.sin(seedX * 12.989 + seedY * 78.233) *
+                                    43758.545) %
+                                1;
+                            if (noise > 0 ? noise < 0.15 : noise > -0.15) {
+                                ctx.fillRect(px + dx + 1, py + dy + 1, 2, 2);
                             }
                         }
                     }
 
                     // --- PASS 2: Vibrant Highlights ---
-                    ctx.fillStyle = lightColor;
-                    for (let dy = 0; dy < TILE_SIZE; dy += STEP) {
-                        for (let dx = 0; dx < TILE_SIZE; dx += STEP) {
-                            const seedX = x * TILE_SIZE + dx;
-                            const seedY = y * TILE_SIZE + dy;
+                    ctx.fillStyle = this._getHslString(h, lightS, lightL);
+                    for (let dy = 0; dy < TILE_SIZE; dy += 4) {
+                        const seedY = baseY + dy;
+                        for (let dx = 0; dx < TILE_SIZE; dx += 4) {
+                            const seedX = baseX + dx;
                             const noise =
-                                Math.abs(
-                                    Math.sin(seedX * 90.123 + seedY * 11.456) *
-                                        12345.678
-                                ) % 1;
-
-                            if (noise < 0.08) {
-                                ctx.fillRect(
-                                    px + dx + 1,
-                                    py + dy + 1,
-                                    SPEC_SIZE,
-                                    SPEC_SIZE
-                                );
+                                (Math.sin(seedX * 90.123 + seedY * 11.456) *
+                                    12345.678) %
+                                1;
+                            if (noise > 0 ? noise < 0.08 : noise > -0.08) {
+                                ctx.fillRect(px + dx + 1, py + dy + 1, 2, 2);
                             }
                         }
                     }
@@ -795,7 +842,7 @@ export class Renderer {
 
         // --- DOWN (Player looking DOWN) ---
         if (diffY < 0) {
-            let segments = Math.abs(diffY) - 1;
+            let segments = -diffY - 1;
 
             if (flipH) {
                 const dx = px + halfTile;
@@ -825,7 +872,7 @@ export class Renderer {
 
         // --- UP (Player looking UP) ---
         if (diffY > 0) {
-            let segments = Math.abs(diffY) - 1;
+            let segments = diffY - 1;
 
             // Logic: UP always uses centered draw with flip
             const dx = px + halfTile;
@@ -843,7 +890,7 @@ export class Renderer {
 
         // --- RIGHT (Player looking RIGHT) ---
         if (diffX < 0) {
-            let segments = Math.abs(diffX) - 1;
+            let segments = -diffX - 1;
 
             // Logic: RIGHT always uses centered draw with flip
             let dx = endPoint.x - TILE * 0.25;
@@ -861,7 +908,7 @@ export class Renderer {
 
         // --- LEFT (Player looking LEFT) ---
         if (diffX > 0) {
-            let segments = Math.abs(diffX) - 1;
+            let segments = diffX - 1;
 
             // Logic: LEFT always uses standard draw
             let dx = endPoint.x - TILE * 0.25;
@@ -878,51 +925,48 @@ export class Renderer {
 
     /**
      * Draw an enemy with inflation, popped, and smooshed states
+     * OPTIMIZED: Reduced string concatenation, early type check
      */
     drawEnemy(enemy) {
         if (!this.spritesLoaded) return;
 
         // Optimization: Bitwise OR 0 truncates decimals faster than Math.floor
         // and ensures we don't render on sub-pixels (blurry edges).
-        const centerX = (enemy.x + TILE_SIZE / 2) | 0;
-        const centerY = (enemy.y + TILE_SIZE / 2) | 0;
+        const halfTile = TILE_SIZE / 2;
+        const centerX = (enemy.x + halfTile) | 0;
+        const centerY = (enemy.y + halfTile) | 0;
+        const type = enemy.type;
+        const flipH = enemy.spriteFlipH;
 
         // 1. Smooshed
         if (enemy.isSmooshed) {
             this.drawSpriteCentered(
-                `${enemy.type}_smooshed`,
+                `${type}_smooshed`,
                 centerX,
                 centerY,
-                enemy.spriteFlipH
+                flipH
             );
             return;
         }
 
         // 2. Popped
         if (enemy.isPopped) {
-            this.drawSpriteCentered(
-                `${enemy.type}_popped`,
-                centerX,
-                centerY,
-                enemy.spriteFlipH
-            );
+            this.drawSpriteCentered(`${type}_popped`, centerX, centerY, flipH);
             return;
         }
 
         // 3. Inflating
         if (enemy.inflateLevel > 1.0) {
-            // Optimization: Map 1.0-2.0 range to integers 1, 2, 3 using math
-            // instead of multiple if/else branches.
-            let stage = Math.floor((enemy.inflateLevel - 1.0) * 3) + 1;
-            // Clamp to ensure we never ask for stage 4 or 0 due to float rounding
-            if (stage > 3) stage = 3;
-            if (stage < 1) stage = 1;
+            // Optimization: Map 1.0-2.0 range to integers 1, 2, 3 using bitwise
+            let stage = ((enemy.inflateLevel - 1.0) * 3 + 1) | 0;
+            // Clamp to 1-3 range
+            stage = stage < 1 ? 1 : stage > 3 ? 3 : stage;
 
             this.drawSpriteCentered(
-                `${enemy.type}_inflating_${stage}`,
+                `${type}_inflating_${stage}`,
                 centerX,
                 centerY,
-                enemy.spriteFlipH
+                flipH
             );
             return;
         }
@@ -930,20 +974,16 @@ export class Renderer {
         // 4. Normal Walking / Ghosting / Fire Logic
         const frameNumber = enemy.animationFrame === 0 ? '1' : '2';
         const state = enemy.isGhosting ? 'ghosting' : 'walking';
+        const isFygar = type === ENEMY_TYPES.FYGAR;
 
-        // Default flip based on movement
-        let renderFlip = enemy.spriteFlipH;
-        const isFygar = enemy.type === ENEMY_TYPES.FYGAR;
-
-        // FYGAR OVERRIDE:
-        // If locked in fire state, ignore movement flip and force fire direction.
-        // Direct boolean assignment is faster than if/else blocks.
-        if (isFygar && enemy.fireDirection) {
-            renderFlip = enemy.fireDirection === DIRECTIONS.RIGHT;
-        }
+        // Default flip, with Fygar override for fire direction
+        const renderFlip =
+            isFygar && enemy.fireDirection
+                ? enemy.fireDirection === DIRECTIONS.RIGHT
+                : flipH;
 
         this.drawSpriteCentered(
-            `${enemy.type}_${state}_${frameNumber}`,
+            `${type}_${state}_${frameNumber}`,
             centerX,
             centerY,
             renderFlip
@@ -951,7 +991,6 @@ export class Renderer {
 
         // 5. Fire Effects (Fygar only)
         if (isFygar) {
-            // Check property directly instead of method call overhead
             const fState = enemy.fireState;
             if (fState === 'charging') {
                 this.drawFygarCharging(enemy);
@@ -1125,22 +1164,27 @@ export class Renderer {
 
     /**
      * Draw floating score displays
+     * OPTIMIZED: Use for loop, cache sheet reference
      */
     drawFloatingScores(floatingScores) {
-        if (!this.spritesLoaded || !this.spritesheet) return;
+        if (!this.spritesLoaded) return;
 
-        floatingScores.forEach((score) => {
-            // Look up sprite by score_[points] name (e.g., score_200, score_1000)
-            const spriteName = `score_${score.points}`;
-            const sprite = this.sprites[spriteName];
-            if (!sprite) return;
+        const sheet = this.spritesheet;
+        const ctx = this.ctx;
+        const sprites = this.sprites;
+        const halfTile = TILE_SIZE / 2;
 
-            // Center the score sprite on the position, round to integers for crisp rendering
-            const drawX = Math.round(score.x + (TILE_SIZE - sprite.width) / 2);
-            const drawY = Math.round(score.y + (TILE_SIZE - sprite.height) / 2);
+        for (let i = 0, len = floatingScores.length; i < len; i++) {
+            const score = floatingScores[i];
+            const sprite = sprites[`score_${score.points}`];
+            if (!sprite) continue;
 
-            this.ctx.drawImage(
-                this.spritesheet,
+            // Center the score sprite on the position, use bitwise for rounding
+            const drawX = (score.x + halfTile - sprite.width / 2 + 0.5) | 0;
+            const drawY = (score.y + halfTile - sprite.height / 2 + 0.5) | 0;
+
+            ctx.drawImage(
+                sheet,
                 sprite.x,
                 sprite.y,
                 sprite.width,
@@ -1150,7 +1194,7 @@ export class Renderer {
                 sprite.width,
                 sprite.height
             );
-        });
+        }
     }
 
     /**
@@ -1283,6 +1327,10 @@ export class Renderer {
     }
 
     getTintedSprite(image, color) {
+        // Check cache first
+        const cached = this._tintedSpriteCache.get(color);
+        if (cached) return cached;
+
         const offscreen = document.createElement('canvas');
         offscreen.width = image.width;
         offscreen.height = image.height;
@@ -1296,11 +1344,14 @@ export class Renderer {
         ctx.fillStyle = color;
         ctx.fillRect(0, 0, offscreen.width, offscreen.height);
 
+        // Cache the result
+        this._tintedSpriteCache.set(color, offscreen);
         return offscreen;
     }
 
     /**
      * Draw text using sprite letters from the spritesheet
+     * OPTIMIZED: Single pass through text, pre-lookup sprites
      * @param {string} text - Text to render
      * @param {number} x - X position
      * @param {number} y - Y position (top of text, unlike canvas which uses baseline)
@@ -1313,66 +1364,72 @@ export class Renderer {
     drawText(text, x, y, options = {}) {
         if (!this.spritesLoaded || !this.spritesheet) return;
 
-        let sheet = this.spritesheet;
         const scale = options.scale ?? 1;
         const spacing = options.spacing ?? 1;
         const align = options.align ?? 'left';
+        const sheet = options.color
+            ? this.getTintedSprite(this.spritesheet, options.color)
+            : this.spritesheet;
 
-        if (options.color) {
-            sheet = this.getTintedSprite(sheet, options.color);
-        }
+        const spaceWidth = 5 * scale + spacing;
+        const defaultWidth = 7 * scale + spacing;
+        const textLen = text.length;
 
-        // Calculate total width for alignment
+        // Pre-lookup all sprites and calculate total width in one pass
+        // Use a small array to store sprite references (avoids re-lookup in draw pass)
+        const spriteRefs = new Array(textLen);
         let totalWidth = 0;
-        for (const char of text) {
+
+        for (let i = 0; i < textLen; i++) {
+            const char = text[i];
             if (char === ' ') {
-                totalWidth += 5 * scale + spacing; // Space width
+                spriteRefs[i] = null;
+                totalWidth += spaceWidth;
             } else {
                 const spriteName = this.getLetterSprite(char);
                 const sprite = spriteName ? this.sprites[spriteName] : null;
-                if (sprite) {
-                    totalWidth += sprite.width * scale + spacing;
-                } else {
-                    // Unknown char - use default width
-                    totalWidth += 7 * scale + spacing;
-                }
+                spriteRefs[i] = sprite;
+                totalWidth += sprite
+                    ? sprite.width * scale + spacing
+                    : defaultWidth;
             }
         }
         // Remove trailing spacing
         totalWidth -= spacing;
 
         // Adjust starting X based on alignment
-        let drawX = x;
-        if (align === 'center') drawX = x - totalWidth / 2;
-        else if (align === 'right') drawX = x - totalWidth;
+        let drawX =
+            align === 'center'
+                ? x - totalWidth / 2
+                : align === 'right'
+                  ? x - totalWidth
+                  : x;
 
         // Adjust Y to account for the difference between canvas text baseline and sprite top
-        // The original drawText used baseline positioning, sprites use top-left
-        // Approximate adjustment based on typical font size to sprite size ratio
-        const adjustedY = y - 7 * scale;
+        const adjustedY = (y - 7 * scale + 0.5) | 0;
+        const ctx = this.ctx;
 
-        // Draw each character
-        for (const char of text) {
+        // Draw each character using pre-looked-up sprites
+        for (let i = 0; i < textLen; i++) {
+            const char = text[i];
             if (char === ' ') {
-                drawX += 5 * scale + spacing;
+                drawX += spaceWidth;
                 continue;
             }
 
-            const spriteName = this.getLetterSprite(char);
-            const sprite = spriteName ? this.sprites[spriteName] : null;
-
+            const sprite = spriteRefs[i];
             if (sprite) {
                 const drawWidth = sprite.width * scale;
                 const drawHeight = sprite.height * scale;
 
-                this.ctx.drawImage(
+                ctx.drawImage(
                     sheet,
                     sprite.x,
                     sprite.y,
                     sprite.width,
                     sprite.height,
-                    Math.round(drawX),
-                    Math.round(adjustedY),
+                    (drawX + 0.5) | 0,
+                    adjustedY,
                     drawWidth,
                     drawHeight
                 );
@@ -1380,7 +1437,7 @@ export class Renderer {
                 drawX += drawWidth + spacing;
             } else {
                 // Unknown char - skip with default width
-                drawX += 7 * scale + spacing;
+                drawX += defaultWidth;
             }
         }
     }
@@ -1404,7 +1461,7 @@ export class Renderer {
         this.drawText(
             'READY!',
             CANVAS_WIDTH / 2,
-            CANVAS_HEIGHT / 2 + TILE_SIZE + 3,
+            CANVAS_HEIGHT / 2 + TILE_SIZE + 2,
             {
                 scale: 1,
                 align: 'center',
