@@ -7,11 +7,10 @@ import {
 } from '../utils/constants.js';
 
 export class ScoreManager {
-    constructor(localStorageKey = HI_SCORE_KEY) {
+    constructor() {
         this.score = 0;
         this.lives = PLAYER.START_LIVES;
         this.highScore = this.loadHighScore();
-        this.localStorageKey = localStorageKey;
 
         // Extra life thresholds: 20,000, 50,000, 100,000, 150,000, ...
         this.nextExtraLifeThreshold = 20000;
@@ -143,7 +142,7 @@ export class ScoreManager {
      */
     loadHighScore() {
         try {
-            const saved = localStorage.getItem(this.localStorageKey);
+            const saved = localStorage.getItem(HI_SCORE_KEY);
             return saved ? parseInt(saved, 10) : 0;
         } catch (e) {
             return 0;
@@ -155,10 +154,7 @@ export class ScoreManager {
      */
     saveHighScore() {
         try {
-            localStorage.setItem(
-                this.localStorageKey,
-                this.highScore.toString()
-            );
+            localStorage.setItem(HI_SCORE_KEY, this.highScore.toString());
         } catch (e) {
             // Ignore localStorage errors
         }

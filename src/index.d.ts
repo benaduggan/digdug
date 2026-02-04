@@ -17,8 +17,6 @@ export interface GameConfig {
     onLevelComplete?: (level: number) => void;
     /** Callback when score changes */
     onScoreChange?: (score: number) => void;
-    /** Key to use to store high score (default: "digdug_highscore") */
-    localStorageKey?: string;
 }
 
 export type GameState =

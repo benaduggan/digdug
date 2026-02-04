@@ -41,7 +41,7 @@ export class Game {
         this.inputManager = new InputManager();
         this.collisionSystem = new CollisionSystem(this.grid);
         this.levelManager = new LevelManager(this.grid);
-        this.scoreManager = new ScoreManager(this.config.localStorageKey);
+        this.scoreManager = new ScoreManager();
 
         // Game entities
         this.player = null;
