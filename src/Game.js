@@ -22,7 +22,7 @@ export class Game {
             container: config.container || document.body,
             width: config.width || CANVAS_WIDTH,
             height: config.height || CANVAS_HEIGHT,
-            scale: config.scale || 1,
+            scale: config.scale || window?.devicePixelRatio || 1,
             debug: config.debug || false,
             level: config.level || 1,
             onGameOver: config.onGameOver || (() => {}),

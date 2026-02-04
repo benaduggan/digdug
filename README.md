@@ -32,9 +32,6 @@ import DigDug from 'taizo-hori';
 
 const game = new DigDug({
     container: document.getElementById('game'),
-    width: 448,
-    height: 448,
-    scale: 2,
     onGameOver: (score) => console.log('Game Over!', score),
     onLevelComplete: (level) => console.log('Level Complete!', level),
     onScoreChange: (score) => console.log('Score:', score),

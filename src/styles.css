@@ -10,24 +10,4 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    font-family: 'Courier New', monospace;
-    color: #fff;
-}
-
-#game-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-}
-
-#game {
-    position: relative;
-}
-
-canvas {
-    display: block;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-    border: 1px solid #333;
 }

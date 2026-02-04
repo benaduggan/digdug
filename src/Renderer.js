@@ -15,6 +15,10 @@ export class Renderer {
     constructor(config) {
         this.config = config;
         this.canvas = document.createElement('canvas');
+        Object.assign(this.canvas.style, {
+            imageRendering: 'pixelated',
+            border: '1px solid #333',
+        });
         this.ctx = this.canvas.getContext('2d');
 
         // Set canvas size
@@ -53,7 +57,7 @@ export class Renderer {
             // Load spritesheet image and sprite map JSON in parallel
             const [spritesheetImg, spriteMapResponse] = await Promise.all([
                 loadImage('/assets/sprites/spritesheet.png'),
-                fetch('/assets/sprites/sprite_map.json'),
+                fetch('/src/utils/sprite_map.json'),
             ]);
 
             this.spritesheet = spritesheetImg;
