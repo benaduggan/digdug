@@ -28,6 +28,7 @@ export class Game {
             onGameOver: config.onGameOver || (() => {}),
             onLevelComplete: config.onLevelComplete || (() => {}),
             onScoreChange: config.onScoreChange || (() => {}),
+            localStorageKey: config.localStorageKey,
         };
 
         this.state = GAME_STATES.MENU;
@@ -40,7 +41,7 @@ export class Game {
         this.inputManager = new InputManager();
         this.collisionSystem = new CollisionSystem(this.grid);
         this.levelManager = new LevelManager(this.grid);
-        this.scoreManager = new ScoreManager();
+        this.scoreManager = new ScoreManager(this.config.localStorageKey);
 
         // Game entities
         this.player = null;
