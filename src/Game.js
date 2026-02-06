@@ -506,57 +506,32 @@ export class Game {
      * Check all collisions
      */
     checkCollisions() {
-        // Pump-enemy collisions (check if pump line hits any enemy)
+        // 1. Player Attacks (Pump)
         if (this.player.pumpLength > 0) {
             this.checkPumpCollisions();
         }
 
-        // Fygar fire-player collisions
+        // 2. Enemy Attacks (Fire Breath)
         this.checkFireCollisions();
 
-        // Player-enemy collisions
-        this.enemies.forEach((enemy) => {
-            if (
-                !enemy.isSmooshed &&
-                enemy.deflateTimer === 0 &&
-                this.collisionSystem.checkPlayerEnemyCollision(
-                    this.player,
-                    enemy
-                )
-            ) {
-                // Player hit by enemy
-                this.playerHit('enemy');
+        // --- ROCK PHASE ---
+        // We filter rocks once and cache 'falling' ones for the enemy phase
+        const fallingRocks = [];
+        const activeRocks = [];
+        let rocksWereDestroyed = false;
+
+        for (const rock of this.rocks) {
+            if (rock.isDestroyed) {
+                this.handleRockDestruction(rock);
+                rocksWereDestroyed = true;
+                continue;
             }
-        });
 
-        // Rock-entity collisions
-        this.rocks.forEach((rock) => {
+            // Optimization: Only track falling rocks for collision checks later
             if (rock.isFalling) {
-                // Check rock-enemy
-                this.enemies.forEach((enemy) => {
-                    // Skip already smooshed enemies
-                    if (enemy.isSmooshed) return;
+                fallingRocks.push(rock);
 
-                    if (
-                        this.collisionSystem.checkRockEntityCollision(
-                            rock,
-                            enemy
-                        )
-                    ) {
-                        rock.markEnemyCrushed(); // Mark rock as having crushed an enemy
-                        // Track this kill for multi-kill scoring (scored when rock finishes)
-                        rock.incrementKillCount(enemy.x, enemy.y);
-
-                        // Smoosh the enemy and attach to rock
-                        enemy.smoosh();
-                        enemy.attachedToRock = rock;
-                        // Immediately sync position so enemy doesn't lag behind
-                        enemy.x = rock.x;
-                        enemy.y = rock.y;
-                    }
-                });
-
-                // Check rock-player (skip if already smooshed)
+                // Check Rock-Player Collision (Instant Death)
                 if (
                     !this.player.isSmooshed &&
                     this.collisionSystem.checkRockEntityCollision(
@@ -564,91 +539,144 @@ export class Game {
                         this.player
                     )
                 ) {
-                    // Smoosh player and attach to rock
                     this.player.smoosh(rock);
-                    // Immediately sync position so player doesn't lag behind
-                    this.player.x = rock.x;
+                    this.player.x = rock.x; // Sync immediately
                     this.player.y = rock.y;
                     this.state = GAME_STATES.DYING;
                     this.deathStartTime = Date.now();
                 }
             }
 
-            // Update smooshed enemies attached to this rock - they fall with it
-            this.enemies.forEach((enemy) => {
-                if (enemy.isSmooshed && enemy.attachedToRock === rock) {
-                    enemy.x = rock.x;
-                    enemy.y = rock.y;
-                }
-            });
-
-            // Update smooshed player attached to this rock - falls with it
+            // Update any player attached to this rock (dying animation)
             if (this.player.isSmooshed && this.player.attachedToRock === rock) {
                 this.player.x = rock.x;
                 this.player.y = rock.y;
             }
-        });
 
-        // Remove destroyed/crumbled rocks and score multi-kills
-        const rocksBeforeFilter = this.rocks.length;
-        this.rocks = this.rocks.filter((rock) => {
-            if (rock.isDestroyed) {
-                this.droppedRocksCount++;
-                this.checkBonusSpawn();
-                // Score rock kills based on total enemies killed by this rock
-                if (rock.enemiesKilled > 0) {
-                    const points = this.scoreManager.addRockKill(
-                        rock.enemiesKilled
-                    );
-                    this.config.onScoreChange(this.scoreManager.score);
-                    // Show floating score at rock's final position (where it crumbled)
-                    this.spawnFloatingScore(points, rock.x, rock.y);
-                }
-                return false;
-            }
-            return true;
-        });
-
-        // Check if all rocks are gone and start respawn timer
-        if (this.rocks.length === 0 && rocksBeforeFilter > 0) {
-            this.needsRockRespawn = true;
-            this.rockRespawnTimer = 0;
+            activeRocks.push(rock);
         }
 
-        // Remove escaped enemies
-        this.enemies = this.enemies.filter((enemy) => !enemy.hasEscaped);
-
-        // Remove destroyed enemies
-        this.enemies = this.enemies.filter((enemy) => {
-            if (enemy.isDestroyed) {
-                // If it's smooshed, WAIT for the rock to finish before removing from array
-                if (
-                    enemy.isSmooshed &&
-                    enemy.attachedToRock &&
-                    !enemy.attachedToRock.isDestroyed
-                ) {
-                    return true; // Keep it in the array so the level doesn't end
-                }
-
-                // Award points for pumped enemies (non-smooshed)
-                if (!enemy.isSmooshed) {
-                    const isHorizontalKill =
-                        this.player.direction === DIRECTIONS.LEFT ||
-                        this.player.direction === DIRECTIONS.RIGHT;
-                    const points = this.scoreManager.addEnemyKill(
-                        enemy.type,
-                        enemy.y,
-                        isHorizontalKill
-                    );
-                    this.config.onScoreChange(this.scoreManager.score);
-                    this.spawnFloatingScore(points, enemy.x, enemy.y);
-                }
-                return false; // Remove if pumped/popped or if its rock is finally gone
+        // Update main rocks array only if needed
+        if (rocksWereDestroyed) {
+            this.rocks = activeRocks;
+            if (this.rocks.length === 0) {
+                this.needsRockRespawn = true;
+                this.rockRespawnTimer = 0;
             }
-            return true;
-        });
+        }
 
-        // Player-bonus item collisions
+        // --- ENEMY PHASE ---
+        // Single pass for Updates, Collisions, and Filtering
+        const activeEnemies = [];
+
+        for (const enemy of this.enemies) {
+            // A. Handle Escaped Enemies
+            if (enemy.hasEscaped) continue;
+
+            // B. Handle Smooshed Enemies (Attached to Rock)
+            if (enemy.isSmooshed && enemy.attachedToRock) {
+                // Sync position to rock
+                enemy.x = enemy.attachedToRock.x;
+                enemy.y = enemy.attachedToRock.y;
+
+                // If the rock is gone, the enemy is finally dead
+                if (enemy.attachedToRock.isDestroyed) continue;
+
+                // Keep in array, but skip other collision checks
+                activeEnemies.push(enemy);
+                continue;
+            }
+
+            // C. Handle Destroyed Enemies (Pumped/Popped)
+            if (enemy.isDestroyed) {
+                this.handleEnemyDestruction(enemy);
+                continue;
+            }
+
+            // D. Rock-Enemy Collisions
+            // Optimization: Only check against the pre-filtered falling rocks
+            if (fallingRocks.length > 0) {
+                for (const rock of fallingRocks) {
+                    if (
+                        this.collisionSystem.checkRockEntityCollision(
+                            rock,
+                            enemy
+                        )
+                    ) {
+                        rock.markEnemyCrushed();
+                        rock.incrementKillCount(enemy.x, enemy.y);
+
+                        enemy.smoosh();
+                        enemy.attachedToRock = rock;
+                        enemy.x = rock.x; // Sync immediately
+                        enemy.y = rock.y;
+                        break; // Enemy can only be crushed by one rock
+                    }
+                }
+                // If we just got smooshed, add to active and skip to next enemy
+                if (enemy.isSmooshed) {
+                    activeEnemies.push(enemy);
+                    continue;
+                }
+            }
+
+            // E. Player-Enemy Collisions (The "Bugginess" Fix)
+            // Ensure enemy is in a valid state to kill the player
+            if (
+                this.state === GAME_STATES.PLAYING && // Don't kill if already dying
+                !this.player.isSmooshed && // Don't kill if player is crushed
+                !enemy.isInflating && // CRITICAL: Can't kill while being pumped
+                !enemy.isSpawning && // CRITICAL: Can't kill while flashing/spawning
+                enemy.deflateTimer === 0 && // Must be fully deflated
+                this.collisionSystem.checkPlayerEnemyCollision(
+                    this.player,
+                    enemy
+                )
+            ) {
+                this.playerHit('enemy');
+            }
+
+            activeEnemies.push(enemy);
+        }
+
+        this.enemies = activeEnemies;
+
+        // 3. Bonus Items (Simplified Filter)
+        this.checkBonusCollisions();
+    }
+
+    // --- Helper Methods to keep main logic clean ---
+
+    handleRockDestruction(rock) {
+        this.droppedRocksCount++;
+        this.checkBonusSpawn();
+
+        if (rock.enemiesKilled > 0) {
+            const points = this.scoreManager.addRockKill(rock.enemiesKilled);
+            this.config.onScoreChange(this.scoreManager.score);
+            this.spawnFloatingScore(points, rock.x, rock.y);
+        }
+    }
+
+    handleEnemyDestruction(enemy) {
+        // Only award points for non-smooshed (pumped) kills here
+        // Rock kills are handled in handleRockDestruction
+        if (!enemy.isSmooshed) {
+            const isHorizontal = [DIRECTIONS.LEFT, DIRECTIONS.RIGHT].includes(
+                this.player.direction
+            );
+            const points = this.scoreManager.addEnemyKill(
+                enemy.type,
+                enemy.y,
+                isHorizontal
+            );
+
+            this.config.onScoreChange(this.scoreManager.score);
+            this.spawnFloatingScore(points, enemy.x, enemy.y);
+        }
+    }
+
+    checkBonusCollisions() {
         this.bonusItems = this.bonusItems.filter((item) => {
             if (
                 this.collisionSystem.checkPlayerBonusCollision(
@@ -656,7 +684,6 @@ export class Game {
                     item
                 )
             ) {
-                // PASS THE LOCKED INDEX
                 const points = this.scoreManager.addBonusItem(item.prizeIndex);
                 this.spawnFloatingScore(points, item.x, item.y);
                 return false;
