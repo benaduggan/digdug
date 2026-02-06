@@ -517,6 +517,7 @@ export class Game {
         // Player-enemy collisions
         this.enemies.forEach((enemy) => {
             if (
+                !enemy.isSmooshed &&
                 enemy.deflateTimer === 0 &&
                 this.collisionSystem.checkPlayerEnemyCollision(
                     this.player,
