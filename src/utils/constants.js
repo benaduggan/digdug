@@ -35,8 +35,8 @@ export const DIRECTIONS = {
 
 // Player settings
 export const PLAYER = {
-    SPEED: 1.2, // Pixels per frame - player should feel responsive
-    DIGGING_SPEED: 1,
+    SPEED: 72, // Pixels per second (was 1.2 per frame at 60fps)
+    DIGGING_SPEED: 60, // Pixels per second (was 1 per frame at 60fps)
     START_LIVES: 3,
     PUMP_RANGE: TILE_SIZE * 3,
 };
@@ -50,15 +50,15 @@ export const ENEMY_TYPES = {
 export const ENEMY = {
     MIN_GHOST_DURATION: 1200, // Must ghost for at least 1.2 seconds
     POOKA: {
-        SPEED: 0.6, // Pixels per frame in tunnels
+        SPEED: 36, // Pixels per second (was 0.6 per frame at 60fps)
         POINTS: 200,
-        GHOST_SPEED: 0.5, // Speed when moving through dirt
+        GHOST_SPEED: 30, // Pixels per second through dirt (was 0.5 per frame)
         GHOST_MODE_DELAY: () => 5000 + Math.floor(Math.random() * 3) * 2500, // 5, 7.5, or 10 seconds before entering ghost mode
     },
     FYGAR: {
-        SPEED: 0.5, // Pixels per frame in tunnels
+        SPEED: 30, // Pixels per second (was 0.5 per frame at 60fps)
         POINTS: 400,
-        GHOST_SPEED: 0.4,
+        GHOST_SPEED: 24, // Pixels per second through dirt (was 0.4 per frame)
         GHOST_MODE_DELAY: 10000, // 10 seconds before entering ghost mode
         FIRE_RANGE: TILE_SIZE * 4,
         FIRE_COOLDOWN: 2500, // 2.5 seconds between fire breaths
@@ -106,8 +106,8 @@ export const ANIMATION = {
 
 // Rock physics
 export const ROCK = {
-    FALL_DELAY: 300, // 400ms delay before rock falls after player triggers it
-    FALL_SPEED: 3, // Pixels per frame when falling
+    FALL_DELAY: 300, // 300ms delay before rock falls after player triggers it
+    FALL_SPEED: 180, // Pixels per second (was 3 per frame at 60fps)
     SHAKE_DURATION: 200, // ms rock shakes before falling (triggered by player from below)
 };
 

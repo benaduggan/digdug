@@ -20,9 +20,9 @@ export class Enemy {
         this.level = level;
 
         // Speed (increases with level)
-        // The base speed increases by 0.05 every time you hit a multiple of 5 (Lvl 5, 10, 15...)
+        // The base speed increases by 3 px/sec every time you hit a multiple of 5 (Lvl 5, 10, 15...)
         const speedTier = Math.floor(level / 5);
-        const TIER_INCREMENT = 0.05;
+        const TIER_INCREMENT = 3; // Pixels per second (was 0.05 per frame at 60fps)
         this.speed = speed + speedTier * TIER_INCREMENT;
 
         // Movement state
@@ -140,7 +140,7 @@ export class Enemy {
 
         // Move enemy
         if (this.isMoving && !this.isInflating) {
-            this.move(grid, player);
+            this.move(grid, player, deltaTime);
         }
 
         // Check if enemy has escaped (walked fully off-screen)
@@ -320,10 +320,10 @@ export class Enemy {
     /**
      * Move enemy through tunnels (or through dirt when ghosting)
      */
-    move(grid, player = null) {
+    move(grid, player = null, deltaTime) {
         // If ghosting, use ghost movement logic
         if (this.isGhosting && player) {
-            this.moveGhost(grid, player);
+            this.moveGhost(grid, player, deltaTime);
             return;
         }
 
@@ -356,29 +356,32 @@ export class Enemy {
             // Even if we didn't enter a new tile, check if we should turn
             // This handles the case where we're passing through an intersection
             // and need to turn toward the player
-            this.checkForBetterDirection(player, grid, gx, gy);
+            this.checkForBetterDirection(player, grid, gx, gy, deltaTime);
         } else if (this.state === 'escaping') {
             // Check for better escape direction mid-tile
-            this.checkForBetterEscapeDirection(grid, gx, gy);
+            this.checkForBetterEscapeDirection(grid, gx, gy, deltaTime);
         }
 
         // Calculate new position based on direction
         let newX = this.x;
         let newY = this.y;
 
+        // Calculate movement based on deltaTime (speed is in pixels per second)
+        const movement = this.speed * (deltaTime / 1000);
+
         switch (this.direction) {
             case DIRECTIONS.UP:
-                newY -= this.speed;
+                newY -= movement;
                 break;
             case DIRECTIONS.DOWN:
-                newY += this.speed;
+                newY += movement;
                 break;
             case DIRECTIONS.LEFT:
-                newX -= this.speed;
+                newX -= movement;
                 if (this.spriteFlipH) this.spriteFlipH = false;
                 break;
             case DIRECTIONS.RIGHT:
-                newX += this.speed;
+                newX += movement;
                 if (!this.spriteFlipH) this.spriteFlipH = true;
                 break;
         }
@@ -397,7 +400,7 @@ export class Enemy {
             this.y = newY;
 
             // Apply grid snapping for tunnel centering
-            this.applyGridSnapping(grid);
+            this.applyGridSnapping(grid, deltaTime);
         } else {
             // Hit a wall, snap to grid and pick new direction
             this.snapToGrid(grid);
@@ -411,9 +414,11 @@ export class Enemy {
      * When escaping, moves toward exit point; otherwise toward player
      * Uses subclass ghostSpeed if defined, otherwise 80% of base speed
      */
-    moveGhost(grid, player) {
+    moveGhost(grid, player, deltaTime) {
         // Use subclass-specific ghostSpeed if available (Pooka/Fygar have different speeds)
         const ghostSpeed = this.ghostSpeed || this.speed * 0.8;
+        // Calculate movement based on deltaTime (ghostSpeed is in pixels per second)
+        const movement = ghostSpeed * (deltaTime / 1000);
 
         // Determine target: when escaping, ghost straight up; otherwise toward player
         let targetX, targetY;
@@ -441,8 +446,8 @@ export class Enemy {
         const normalizedDy = dy / distance;
 
         // Calculate desired movement
-        const moveX = normalizedDx * ghostSpeed;
-        const moveY = normalizedDy * ghostSpeed;
+        const moveX = normalizedDx * movement;
+        const moveY = normalizedDy * movement;
 
         // Try diagonal movement first (both axes)
         const newX = this.x + moveX;
@@ -512,7 +517,7 @@ export class Enemy {
         }
 
         for (const dir of perpDirs) {
-            const newPos = this.getNewPosition(this.x, this.y, dir, ghostSpeed);
+            const newPos = this.getNewPosition(this.x, this.y, dir, movement);
             if (this.canGhostMoveToPosition(newPos.x, newPos.y, grid)) {
                 this.x = newPos.x;
                 this.y = newPos.y;
@@ -529,7 +534,7 @@ export class Enemy {
             DIRECTIONS.RIGHT,
         ];
         for (const dir of allDirs) {
-            const newPos = this.getNewPosition(this.x, this.y, dir, ghostSpeed);
+            const newPos = this.getNewPosition(this.x, this.y, dir, movement);
             if (this.canGhostMoveToPosition(newPos.x, newPos.y, grid)) {
                 this.x = newPos.x;
                 this.y = newPos.y;
@@ -621,7 +626,7 @@ export class Enemy {
      * Check if there's a better direction toward the player while passing through a tile
      * Only triggers at intersections (3+ valid directions)
      */
-    checkForBetterDirection(player, grid, gx, gy) {
+    checkForBetterDirection(player, grid, gx, gy, deltaTime) {
         // Get valid directions FIRST
         const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
 
@@ -679,7 +684,8 @@ export class Enemy {
                 alignmentError = Math.abs(this.y - tileCenterY);
             }
             // Very tight tolerance - only turn when essentially at tile center
-            const tolerance = this.speed;
+            const movement = this.speed * (deltaTime / 1000);
+            const tolerance = movement;
 
             if (alignmentError <= tolerance) {
                 this.direction = preferredDirection;
@@ -1104,7 +1110,7 @@ export class Enemy {
     /**
      * Check for better escape direction mid-tile (at intersections)
      */
-    checkForBetterEscapeDirection(grid, gx, gy) {
+    checkForBetterEscapeDirection(grid, gx, gy, deltaTime) {
         const validDirections = this.getValidDirectionsFromTile(grid, gx, gy);
 
         // Only consider turns at intersections (3+ directions)
@@ -1157,7 +1163,8 @@ export class Enemy {
                 alignmentError = Math.abs(this.y - tileCenterY);
             }
 
-            const tolerance = this.speed;
+            const movement = this.speed * (deltaTime / 1000);
+            const tolerance = movement;
             if (alignmentError <= tolerance) {
                 this.direction = preferredDirection;
                 this.tilesTraveledInDirection = 0;
@@ -1391,7 +1398,7 @@ export class Enemy {
     /**
      * Apply grid snapping to keep enemy centered in tunnels
      */
-    applyGridSnapping(grid) {
+    applyGridSnapping(grid, deltaTime) {
         const { x: gx, y: gy } = grid.pixelToGrid(
             this.x + TILE_SIZE / 2,
             this.y + TILE_SIZE / 2
@@ -1401,6 +1408,9 @@ export class Enemy {
         if (!grid.isEmpty(gx, gy)) {
             return;
         }
+
+        // Calculate movement based on deltaTime
+        const movement = this.speed * (deltaTime / 1000);
 
         // When moving horizontally, align vertically to grid center
         if (
@@ -1412,7 +1422,7 @@ export class Enemy {
 
             if (Math.abs(diff) > 0) {
                 const snapAmount =
-                    Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
+                    Math.sign(diff) * Math.min(Math.abs(diff), movement);
                 this.y += snapAmount;
             }
         }
@@ -1427,7 +1437,7 @@ export class Enemy {
 
             if (Math.abs(diff) > 0) {
                 const snapAmount =
-                    Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
+                    Math.sign(diff) * Math.min(Math.abs(diff), movement);
                 this.x += snapAmount;
             }
         }

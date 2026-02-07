@@ -113,7 +113,7 @@ export class Rock {
 
         // Update falling
         if (this.isFalling) {
-            this.fall(grid);
+            this.fall(grid, deltaTime);
         }
 
         // Check if player is touching rock from below to trigger fall
@@ -212,8 +212,9 @@ export class Rock {
     /**
      * Fall downward
      */
-    fall(grid) {
-        this.y += this.fallSpeed;
+    fall(grid, deltaTime) {
+        const movement = this.fallSpeed * (deltaTime / 1000);
+        this.y += movement;
 
         // Update grid position
         const newGridY = Math.floor(this.y / TILE_SIZE);

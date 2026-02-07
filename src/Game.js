@@ -307,7 +307,9 @@ export class Game {
      * Update intro animation
      */
     updateIntro(deltaTime) {
-        const speed = this.config.debug ? 3 : 1.6; // Player movement speed during intro
+        // Speed in pixels per second (was 3 and 1.6 per frame at 60fps)
+        const speedPerSecond = this.config.debug ? 180 : 96;
+        const speed = speedPerSecond * (deltaTime / 1000);
 
         if (this.introPhase !== 'ready') {
             // Update player animation

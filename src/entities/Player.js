@@ -22,8 +22,8 @@ export class Player {
         this.pumpTarget = null;
         this.pumpLength = 0; // Current length of pump line in pixels
         this.pumpMaxLength = PLAYER.PUMP_RANGE;
-        this.pumpExtendSpeed = 4; // Pixels per frame to extend
-        this.pumpRetractSpeed = 8; // Faster retract when releasing
+        this.pumpExtendSpeed = 240; // Pixels per second to extend (was 4 per frame)
+        this.pumpRetractSpeed = 480; // Pixels per second to retract (was 8 per frame)
         this.shouldAutoRetract = false; // Auto-retract when max length reached without hitting
         this.pumpUsed = false; // Tracks if pump was used this Space press (requires re-press)
         this.fullLengthTimer = 0; // Timer for delay at full length before auto-retract
@@ -139,7 +139,7 @@ export class Player {
             }
             this.extendPump(deltaTime);
         } else if (this.isShooting || this.pumpLength > 0) {
-            this.retractPump();
+            this.retractPump(deltaTime);
         }
 
         // Get input direction - but don't move or rotate while pumping
@@ -161,7 +161,7 @@ export class Player {
             }
             this.direction = inputDirection;
             this.isMoving = true;
-            this.move(inputDirection, grid);
+            this.move(inputDirection, grid, deltaTime);
         } else {
             this.isMoving = false;
         }
@@ -185,22 +185,25 @@ export class Player {
     /**
      * Move player in direction
      */
-    move(direction, grid) {
+    move(direction, grid, deltaTime) {
         let newX = this.x;
         let newY = this.y;
 
+        // Calculate movement based on deltaTime (speed is in pixels per second)
+        const movement = this.speed * (deltaTime / 1000);
+
         switch (direction) {
             case DIRECTIONS.UP:
-                newY -= this.speed;
+                newY -= movement;
                 break;
             case DIRECTIONS.DOWN:
-                newY += this.speed;
+                newY += movement;
                 break;
             case DIRECTIONS.LEFT:
-                newX -= this.speed;
+                newX -= movement;
                 break;
             case DIRECTIONS.RIGHT:
-                newX += this.speed;
+                newX += movement;
                 break;
         }
 
@@ -242,7 +245,7 @@ export class Player {
                 const diff = targetY - this.y;
                 if (Math.abs(diff) > 0) {
                     this.y +=
-                        Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
+                        Math.sign(diff) * Math.min(Math.abs(diff), movement);
                 }
             }
 
@@ -255,7 +258,7 @@ export class Player {
                 const diff = targetX - this.x;
                 if (Math.abs(diff) > 0) {
                     this.x +=
-                        Math.sign(diff) * Math.min(Math.abs(diff), this.speed);
+                        Math.sign(diff) * Math.min(Math.abs(diff), movement);
                 }
             }
         }
@@ -406,8 +409,9 @@ export class Player {
 
         if (this.pumpLength < this.pumpMaxLength) {
             // Check if extending would go into dirt
+            const extension = this.pumpExtendSpeed * (deltaTime / 1000);
             const nextLength = Math.min(
-                this.pumpLength + this.pumpExtendSpeed,
+                this.pumpLength + extension,
                 this.pumpMaxLength
             );
 
@@ -464,7 +468,7 @@ export class Player {
     /**
      * Retract pump line when Space is released
      */
-    retractPump() {
+    retractPump(deltaTime) {
         // If the target was destroyed (popped), immediately clear the pump
         if (this.pumpTarget && this.pumpTarget.isDestroyed) {
             this.pumpLength = 0;
@@ -472,7 +476,8 @@ export class Player {
             return;
         }
 
-        this.pumpLength = Math.max(0, this.pumpLength - this.pumpRetractSpeed);
+        const retraction = this.pumpRetractSpeed * (deltaTime / 1000);
+        this.pumpLength = Math.max(0, this.pumpLength - retraction);
         if (this.pumpLength === 0) {
             this.stopPump();
         }
