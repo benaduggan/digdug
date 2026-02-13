@@ -45,6 +45,7 @@
     ],
     "scripts": {
         "build": "vite build",
+        "build:demo": "vite build --config vite.config.demo.js",
         "dev": "vite",
         "format": "prettier --write \"**/*.{js,json,md}\"",
         "format:check": "prettier --check \"**/*.{js,json,md}\"",
