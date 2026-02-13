@@ -7,6 +7,8 @@
 
 A faithful recreation of the classic 1982 Dig Dug arcade game using vanilla JavaScript and HTML5 Canvas.
 
+**[Play it here!](https://IanSmith89.github.io/digdug/)**
+
 ## Features
 
 - ✅ Authentic arcade gameplay mechanics
